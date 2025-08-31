@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 
 // Configuración
 const MODO_BASE_URL = process.env.MODO_BASE_URL || 'https://merchants.preprod.playdigital.com.ar';
-const MODO_USERNAME = process.env.MODO_USERNAME || 'PLAYDIGITALSA-318979-preprod';
+const MODO_USERNAME = process.env.MODO_USERNAME || 'PLAYDIGITAL SA-318979-preprod';
 const MODO_PASSWORD = process.env.MODO_PASSWORD || '318979-P75V/QLKfVKX';
 const MODO_PROCESSOR_CODE = process.env.MODO_PROCESSOR_CODE || 'P1018';
 const MODO_USER_AGENT = process.env.MODO_USER_AGENT || 'Gardenlife-Shopify';
