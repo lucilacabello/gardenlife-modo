@@ -1,84 +1,47 @@
-import {
-  reactExtension,
-  Button,
-  Modal,
-  Image,
-  useApi,
-} from "@shopify/ui-extensions-react/checkout";
 import React from "react";
+import { reactExtension, Text, Button, useApi, useSubscription } from "@shopify/ui-extensions-react/checkout";
 
-export default reactExtension(
-  "purchase.checkout.payment-methods.render-after",
-  () => <ModoPay />
-);
+export default reactExtension("purchase.thank-you.block.render", () => <ModoPay />);
 
 function ModoPay() {
   const api = useApi();
+  const orderConfirmation = useSubscription(api.orderConfirmation);
+  const orderId = orderConfirmation?.id ?? "TEST123"; // fallback para test
 
-  const [open, setOpen] = React.useState(false);
-  const [qrSrc, setQrSrc] = React.useState<string | null>(null);
-  const [paymentId, setPaymentId] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [state, setState] = React.useState({ loading: false, data: null, error: null });
 
-  async function onPayWithModo() {
-    setError(null);
+  async function testFetch() {
+    setState({ loading: true, data: null, error: null });
     try {
-      // 1) Tomar el total del checkout
-      const amount = api.cost.totalAmount.amount;
+      // Opción 1 — vía App Proxy (no necesita CORS, requiere la app instalada):
+      // usa SIEMPRE ruta relativa para que vaya al dominio de la tienda
+      const res = await fetch(`/apps/modo/qr?orderId=${orderId}&mock=1`);
 
-      // 2) Llamar a TU App Proxy (debe apuntar a Vercel /api/modo/qr)
-      const res = await fetch(`/apps/modo/qr?amount=${amount}`, { method: "GET" });
-      const data = await res.json();
+      // Opción 2 — directo a Vercel (sirve también en el Dev Console; necesita CORS, que ya pusiste):
+      // const res = await fetch(`https://gardenlife-modo.vercel.app/apps/modo/qr?orderId=${orderId}&mock=1`);
 
-      if (!res.ok || !data?.qrBase64 || !data?.paymentId) {
-        throw new Error(data?.error || "INIT_FAIL");
-      }
-
-      // 3) Mostrar QR en modal
-      setQrSrc(`data:image/png;base64,${data.qrBase64}`);
-      setPaymentId(data.paymentId);
-      setOpen(true);
-
-      // 4) Empezar polling de estado
-      startPolling(data.paymentId);
-    } catch (e) {
-      setError("No pudimos iniciar MODO. Intentá nuevamente.");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setState({ loading: false, data: json, error: null });
+      console.log("MODO ▶ respuesta:", json);
+    } catch (err) {
+      console.error("MODO ▶ error:", err);
+      setState({ loading: false, data: null, error: String(err) });
     }
-  }
-
-  function startPolling(id: string) {
-    const iv = setInterval(async () => {
-      try {
-        const r = await fetch(`/apps/modo/status/${id}`);
-        const s = await r.json(); // { status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'EXPIRED' }
-
-        if (s?.status === "APPROVED") {
-          clearInterval(iv);
-          setOpen(false);
-          // MVP: el usuario finaliza con "Pay now".
-          // (Para automatizar 100% la orden se necesita Payments App.)
-        }
-        if (s?.status === "REJECTED" || s?.status === "EXPIRED") {
-          clearInterval(iv);
-          setOpen(false);
-          setError("El pago fue rechazado o expiró. Probá nuevamente.");
-        }
-      } catch {
-        // silencio, reintenta en el próximo tick
-      }
-    }, 2000);
   }
 
   return (
     <>
-      {error && <div style={{ color: "red", marginBottom: 8 }}>{error}</div>}
-
-      <Button onPress={onPayWithModo}>Pagar con MODO</Button>
-
-      {open && (
-        <Modal title="Escaneá con MODO" onClose={() => setOpen(false)}>
-          {qrSrc ? <Image source={qrSrc} alt="QR MODO" /> : "Generando QR…"}
-        </Modal>
+      <Text>✅ Bloque MODO cargado (orderId: {orderId})</Text>
+      <Button onPress={testFetch}>
+        Probar fetch al backend
+      </Button>
+      {state.loading && <Text>⏳ Cargando...</Text>}
+      {state.error && <Text>❌ Error: {state.error}</Text>}
+      {state.data && (
+        <Text>
+          🔎 Mock ID: {state.data.id} • vence: {state.data.expiration_date}
+        </Text>
       )}
     </>
   );
