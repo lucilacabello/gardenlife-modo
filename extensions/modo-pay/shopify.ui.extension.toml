@@ -1,0 +1,10 @@
+name = "Modo Pay"
+type = "checkout_ui_extension"
+
+extension_points = [
+  "checkout.payment-methods.render",
+  "purchase.thank-you.block.render"
+]
+
+[capabilities]
+network_access = true
