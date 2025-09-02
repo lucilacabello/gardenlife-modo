@@ -5,7 +5,6 @@ type ModoQrResp = {
   paymentId?: string;
   qrBase64?: string;
   expiresAt?: string | null;
-  // otros campos posibles...
   [k: string]: unknown;
 };
 
@@ -14,6 +13,7 @@ function allowCors(res: any) {
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Cache-Control", "no-store");
 }
 
 export default async function handler(req: any, res: any) {
@@ -27,9 +27,24 @@ export default async function handler(req: any, res: any) {
   try {
     const amountParam = req.query?.amount ?? req.body?.amount;
     const amount = Number(amountParam);
-    if (!amount || Number.isNaN(amount)) {
+    if (!(amount >= 0.01) || Number.isNaN(amount)) {
       return res.status(400).json({ error: "INVALID_AMOUNT", detail: amountParam });
     }
+
+    // --- MODO MOCK: para pruebas desde la tienda sin credenciales reales ---
+    if (req.query?.mock === "1") {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+        <rect width='200' height='200' fill='#EEEEEE'/>
+        <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='#333'>MOCK QR</text>
+      </svg>`;
+      const qrBase64 = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+      return res.status(200).json({
+        paymentId: "MOCK-PAYMENT-123",
+        qrBase64,
+        expiresAt: null,
+      });
+    }
+    // ----------------------------------------------------------------------
 
     // 1) Obtener TOKEN
     const tRes = await fetch(`${process.env.MODO_BASE_URL}/v2/stores/companies/token`, {
@@ -39,7 +54,7 @@ export default async function handler(req: any, res: any) {
         "User-Agent": "Gardenlife-Checkout",
       },
       body: JSON.stringify({
-        username: process.env.MODO_USERNAME, // "PLAYDIGITAL SA-318979-preprod"
+        username: process.env.MODO_USERNAME,
         password: process.env.MODO_PASSWORD,
       }),
     });
@@ -57,7 +72,7 @@ export default async function handler(req: any, res: any) {
       return res.status(502).json({ error: "TOKEN_EMPTY", detail: tJson });
     }
 
-    // 2) Crear pago QR (ajustar payload si tu contrato difiere)
+    // 2) Crear pago QR (ajustar según contrato/endpoint real)
     const qRes = await fetch(`${process.env.MODO_BASE_URL}/v2/payments/qr`, {
       method: "POST",
       headers: {
@@ -65,9 +80,10 @@ export default async function handler(req: any, res: any) {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        amount: Math.round(amount * 100), // en centavos si aplica
+        amount: Math.round(amount * 100), // centavos
         currency: "ARS",
         description: "Checkout Gardenlife",
+        // callbackUrls, processorCode, etc. si MODO lo pide
       }),
     });
 
@@ -88,5 +104,4 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: "UNEXPECTED_QR", detail: String(err?.message || err) });
   }
 }
-
 
