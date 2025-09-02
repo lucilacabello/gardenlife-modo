@@ -8,8 +8,9 @@ type ModoStatusResp = {
 function allowCors(res: any) {
   const origin = `https://${process.env.SHOP_DOMAIN}`;
   res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Cache-Control", "no-store");
 }
 
 export default async function handler(req: any, res: any) {
@@ -20,8 +21,17 @@ export default async function handler(req: any, res: any) {
 
   allowCors(res);
 
-  const { id } = req.query || {};
+  const { id, mock } = req.query || {};
   if (!id) return res.status(400).json({ error: "MISSING_ID" });
+
+  // --- MOCK opcional para pruebas desde la UI ---
+  if (mock === "1") {
+    // rotamos estados para testear UI
+    const states = ["PENDING", "APPROVED", "REJECTED", "EXPIRED"] as const;
+    const idx = Math.floor(Date.now() / 5000) % states.length;
+    return res.status(200).json({ status: states[idx] });
+  }
+  // ------------------------------------------------
 
   try {
     // 1) Token
@@ -43,12 +53,13 @@ export default async function handler(req: any, res: any) {
       return res.status(502).json({ error: "TOKEN_FAIL", status: tRes.status, detail: txt });
     }
 
-    const { token } = (await tRes.json()) as { token?: string };
-    if (!token) return res.status(502).json({ error: "TOKEN_EMPTY" });
+    const tJson = (await tRes.json().catch(() => ({}))) as { token?: string; access_token?: string };
+    const bearer = tJson.token || tJson.access_token;
+    if (!bearer) return res.status(502).json({ error: "TOKEN_EMPTY" });
 
     // 2) Consultar estado
     const sRes = await fetch(`${process.env.MODO_BASE_URL}/v2/payments/${id}/status`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${bearer}` },
     });
 
     const sJson = (await sRes.json().catch(() => ({}))) as ModoStatusResp;
@@ -58,7 +69,6 @@ export default async function handler(req: any, res: any) {
       return res.status(502).json({ error: "STATUS_FAIL", status: sRes.status, detail: sJson });
     }
 
-    // Esperado: { status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'EXPIRED' }
     return res.status(200).json(sJson);
   } catch (err: any) {
     console.error("UNEXPECTED_STATUS", err);
