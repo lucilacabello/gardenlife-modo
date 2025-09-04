@@ -1,9 +1,9 @@
-name = "Modo Pay"
+name = "modo-pay"
 type = "checkout_ui_extension"
 
 extension_points = [
-  "checkout.payment-methods.render",
-  "purchase.thank-you.block.render"
+  "purchase.thank-you.block.render",
+  "checkout.order-status.block.render"
 ]
 
 [capabilities]
