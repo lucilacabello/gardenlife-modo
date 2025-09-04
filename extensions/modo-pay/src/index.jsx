@@ -8,9 +8,9 @@ import {
   useOrder,
 } from "@shopify/ui-extensions-react/checkout";
 
-// Podés usar cualquiera de los dos puntos de inserción:
+// Elegí uno (o duplicá export para probar en ambos)
 export default reactExtension("purchase.thank-you.block.render", () => <ModoPayBlock />);
-// o: export default reactExtension("checkout.order-status.block.render", () => <ModoPayBlock />);
+// export default reactExtension("checkout.order-status.block.render", () => <ModoPayBlock />);
 
 function ModoPayBlock() {
   const order = useOrder();
@@ -21,10 +21,9 @@ function ModoPayBlock() {
   const [status, setStatus] = useState("PENDING");
   const [error, setError] = useState("");
 
-  // Si configuraste App Proxy, podés llamar '/apps/modo/checkout'.
-  // Si no, usa el dominio público de Vercel:
-  const CHECKOUT_URL = "https://gardenlife-modo.vercel.app/api/modo/checkout";
-  const STATUS_URL = (id) => `https://gardenlife-modo.vercel.app/api/modo/status/${id}`;
+  // ✅ Ahora por App Proxy (no llamamos a Vercel directo)
+  const CHECKOUT_URL = "/apps/modo/checkout";
+  const STATUS_URL = (id) => `/apps/modo/status/${id}`;
 
   useEffect(() => {
     const create = async () => {
@@ -36,7 +35,7 @@ function ModoPayBlock() {
           body: JSON.stringify({ amount, orderId }),
         });
         const j = await r.json();
-        if (!r.ok) throw new Error(j?.error || "CREATE_FAIL");
+        if (!r.ok || !j?.id) throw new Error(j?.error || "CREATE_FAIL");
         setData(j);
       } catch (e) {
         setError(e.message || "Error creando intención");
@@ -52,7 +51,7 @@ function ModoPayBlock() {
         const r = await fetch(STATUS_URL(data.id));
         const j = await r.json();
         if (j?.status) setStatus(j.status);
-      } catch (e) {}
+      } catch (_e) {}
     }, 3500);
     return () => clearInterval(iv);
   }, [data?.id]);
@@ -72,7 +71,7 @@ function ModoPayBlock() {
           {data?.deeplink && (
             <Button to={data.deeplink} kind="primary">Abrir en MODO</Button>
           )}
-          <Text appearance="subdued">Escaneá el QR o abrí la app. Vence ~10 minutos.</Text>
+          <Text appearance="subdued">Escaneá el QR o abrí la app. Vence en ~10 min.</Text>
         </>
       )}
 
