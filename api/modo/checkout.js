@@ -1,38 +1,54 @@
 // /api/modo/checkout.js
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0,
-      v = c === 'x' ? r : (r & 0x3) | 0x8;
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
 
+async function getTokenInternal() {
+  // Llama a nuestro endpoint de token dentro del mismo proyecto (hostname dinámico)
+  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+  const r = await fetch(`${base}/api/modo/token`);
+  if (!r.ok) throw new Error(`Token error: ${r.status}`);
+  const j = await r.json();
+  return j.access_token;
+}
+
 export default async function handler(req, res) {
-  // CORS
+  // CORS para la extensión
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { amount, orderId, customer } = req.body || {};
-    if (!amount) {
-      return res.status(400).json({ error: 'AMOUNT_REQUIRED' });
-    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
 
-    // 1) Pedir token a nuestro propio endpoint
-    const tokenRes = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : ''}/api/modo/token`);
-    const { access_token } = await tokenRes.json();
+    // Si Vercel no parsea JSON automáticamente
+    const body = req.body || (await new Promise((resolve) => {
+      let data = '';
+      req.on('data', chunk => data += chunk);
+      req.on('end', () => resolve(data ? JSON.parse(data) : {}));
+    }));
 
-    // 2) Payload para crear payment request en MODO
+    const { amount, orderId, customer } = body || {};
+    if (amount == null) return res.status(400).json({ error: 'AMOUNT_REQUIRED' });
+
+    const access_token = await getTokenInternal();
+
+    // external_intention_id SIEMPRE único
+    const externalId = orderId || uuid();
+
     const payload = {
-      description: `Pedido ${orderId || ''}`.trim(),
+      description: `Pedido ${externalId}`,
       amount: Number(amount),
       currency: 'ARS',
       cc_code: process.env.MODO_CC_CODE,
       processor_code: process.env.MODO_PROCESSOR_CODE, // P1018
-      external_intention_id: orderId || uuid(), // siempre único
-      webhook_notification: `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : ''}/api/modo/webhook`,
+      external_intention_id: externalId,
+      webhook_notification: process.env.MODO_WEBHOOK_URL,
       customer: customer || undefined
     };
 
@@ -49,18 +65,19 @@ export default async function handler(req, res) {
     const j = await r.json();
 
     if (!r.ok) {
+      // Te devuelvo detalle crudo para debug rápido
       return res.status(r.status).json({ error: 'CREATE_FAIL', detail: j });
     }
 
-    // Lo que va a consumir Shopify
-    res.status(200).json({
+    // Respuesta mínima que necesita la UI
+    return res.status(200).json({
       id: j.id,
       qr: j.qr,
       deeplink: j.deeplink,
       expiration_date: j.expiration_date
     });
   } catch (e) {
-    console.error('ERROR CHECKOUT:', e);
-    res.status(500).json({ error: 'SERVER_ERROR', message: e.message });
+    return res.status(500).json({ error: 'SERVER_ERROR', message: e?.message || 'Unexpected' });
   }
 }
+
