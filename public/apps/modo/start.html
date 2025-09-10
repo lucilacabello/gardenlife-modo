@@ -19,14 +19,10 @@
     <p class="muted">Monto: <span id="amountText">—</span></p>
     <p>Estamos generando tu QR / deeplink…</p>
     <div id="status"></div>
-    <div style="margin-top:16px">
-      <button id="retryBtn" type="button">Reintentar (nuevo QR)</button>
-    </div>
   </div>
 
   <script>
     const statusEl = document.getElementById('status');
-    const retryBtn = document.getElementById('retryBtn');
     const amountText = document.getElementById('amountText');
 
     // lee ?amount= del query (si viene desde el checkout), default 10
@@ -37,11 +33,9 @@
 
     async function createPaymentIntention() {
       const url = `/api/modo/payment-request?amount=${encodeURIComponent(amount)}`;
-      const res = await fetch(url, { method: 'GET' });
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`PAYMENT_REQUEST_FAIL ${res.status}`);
       const json = await res.json();
-      // 👇 Log clave para comparar entre montos y reintentos
-      console.log('MODO checkoutId:', json.id);
       return { checkoutId: json.id, qrString: json.qr, deeplink: json.deeplink };
     }
 
@@ -49,11 +43,8 @@
       try {
         const modalData = await createPaymentIntention();
 
-        // guardamos referencia a la función para usarla en refresh y en el botón
-        async function refresh() {
-          statusEl.textContent = 'Regenerando QR…';
-          return await createPaymentIntention();
-        }
+        // 👇 LOG clave para verlo en Console
+        console.log('MODO checkoutId:', modalData.checkoutId);
 
         const modalObject = {
           version: '2',
@@ -61,25 +52,15 @@
           checkoutId: modalData.checkoutId,
           deeplink: {
             url: modalData.deeplink,
-            // mobile:
             callbackURL:        `${location.origin}/checkout`,
             callbackURLSuccess: `${location.origin}/thankyou`
           },
-          // desktop:
           callbackURL: `${location.origin}/thankyou`,
-          // reintento → nueva intención con nuevo external_intention_id
-          refreshData: refresh
+          refreshData: createPaymentIntention
         };
 
         statusEl.textContent = 'Abriendo MODO…';
         ModoSDK.modoInitPayment(modalObject);
-
-        // Botón manual para validar refreshData (nuevo QR y nuevo checkoutId)
-        retryBtn.addEventListener('click', async () => {
-          await refresh();
-          // El modal invocará internamente el nuevo QR cuando llame a refreshData
-          // (si quisieras, podríamos reabrir el modal explícitamente)
-        });
       } catch (e) {
         statusEl.textContent = 'No pudimos iniciar MODO. Reintentá.';
         console.error(e);
