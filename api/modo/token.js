@@ -1,5 +1,7 @@
 // /api/modo/token.js
-let cache = { token: null, exp: 0 }; // cache simple en memoria (se reinicia por deploy)
+// Genera y cachea el token de MODO por ~7 días (TTL real: 604800 s)
+
+let cache = { token: null, exp: 0 };
 
 export default async function handler(req, res) {
   try {
@@ -8,30 +10,30 @@ export default async function handler(req, res) {
       return res.status(200).json({ access_token: cache.token, cached: true });
     }
 
-    const r = await fetch(process.env.MODO_BASE_URL + '/v2/stores/companies/token', {
+    const base = process.env.MODO_BASE_URL; // ej: https://merchants.preprod.playdigital.com.ar
+    const r = await fetch(`${base}/v2/stores/companies/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': process.env.MODO_USER_AGENT
+        'Accept': 'application/json',
+        'User-Agent': process.env.MODO_USER_AGENT, // OBLIGATORIO
       },
       body: JSON.stringify({
         username: process.env.MODO_USERNAME,
-        password: process.env.MODO_PASSWORD
-      })
+        password: process.env.MODO_PASSWORD,
+      }),
     });
 
-    // Si falla, devolveme texto para ver el error real
+    const data = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const txt = await r.text();
-      return res.status(r.status).json({ error: 'TOKEN_FAIL', detail: txt });
+      return res.status(r.status).json({ error: 'TOKEN_FAIL', detail: data });
     }
 
-    const j = await r.json(); // { access_token, token_type, expires_in }
-    // El manual indica expires_in ~ 604800s (7 días). Cacheo 6 días para evitar borde.
-    cache.token = j.access_token;
-    cache.exp = now + 6 * 24 * 60 * 60 * 1000;
+    // Guardar en cache (TTL 7 días)
+    const ttlMs = (Number(data.expires_in || 604800) * 1000) - 60_000; // 1 min colchón
+    cache = { token: data.access_token, exp: now + ttlMs };
 
-    return res.status(200).json({ access_token: cache.token, cached: false });
+    return res.status(200).json({ access_token: data.access_token, expires_in: data.expires_in });
   } catch (e) {
     return res.status(500).json({ error: 'SERVER_ERROR', message: e?.message || 'Unexpected' });
   }
