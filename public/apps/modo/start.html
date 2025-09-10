@@ -27,7 +27,6 @@
     const amount = Number(params.get('amount') || 10);
 
     async function createPaymentIntention() {
-          console.log('MODO checkoutId:', modalData.checkoutId); // 👈 agrega esta línea
       const url = `/api/modo/payment-request?amount=${amount}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`PAYMENT_REQUEST_FAIL ${res.status}`);
