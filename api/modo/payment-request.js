@@ -1,13 +1,20 @@
 // /api/modo/payment-request.js
+
 function uid() {
   return (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)) + Date.now();
 }
 
-async function getToken() {
-  const url = process.env.APP_URL
-    ? `${process.env.APP_URL}/api/modo/token`
-    : '/api/modo/token';
-  const r = await fetch(url, { method: 'POST' });
+// Construye la base URL en runtime (sirve en Vercel)
+function getBaseUrl(req) {
+  if (process.env.APP_URL) return process.env.APP_URL; // ej: https://gardenlife-modo.vercel.app
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers.host;
+  return `${proto}://${host}`;
+}
+
+async function getToken(req) {
+  const base = getBaseUrl(req);
+  const r = await fetch(`${base}/api/modo/token`, { method: 'POST' });
   if (!r.ok) throw new Error(`TOKEN_FAIL ${r.status}`);
   const j = await r.json();
   return j.access_token || j.token || j.accessToken;
@@ -16,13 +23,13 @@ async function getToken() {
 export default async function handler(req, res) {
   try {
     const method = req.method || 'GET';
-    const token = await getToken();
+    const token = await getToken(req);
     const base = process.env.MODO_BASE_URL;
 
     const rawAmount =
       method === 'POST'
-        ? (req.body?.amount)
-        : (req.query?.amount);
+        ? req.body?.amount
+        : req.query?.amount;
     const amount = Number(rawAmount ?? 1);
 
     const body = {
@@ -33,6 +40,7 @@ export default async function handler(req, res) {
       processor_code: process.env.MODO_PROCESSOR_CODE,
       external_intention_id: uid(),
       webhook_notification: process.env.MODO_WEBHOOK_URL,
+      // Opcional: definir expiración manual (5–10 min)
       // expiration_date: new Date(Date.now() + 9*60*1000).toISOString(),
     };
 
@@ -51,7 +59,7 @@ export default async function handler(req, res) {
       return res.status(r.status).json({ error: 'PAYMENT_REQUEST_FAIL', detail: data });
     }
 
-    // Esperamos { id, qr, deeplink, ... }
+    // Respuesta esperada: { id, qr, deeplink, expiration_* }
     return res.status(200).json({
       id: data.id,
       qr: data.qr,
