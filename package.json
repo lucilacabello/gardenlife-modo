@@ -1,12 +1,10 @@
 {
   "name": "gardenlife-modo",
   "private": true,
-  "dependencies": {
-    "node-fetch": "^2.6.7"
-  },
-  "devDependencies": {
-    "@types/node": "^18.0.0",
-    "@types/node-fetch": "^2.6.2",
-    "typescript": "^4.9.5"
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "echo build-root-ok",
+    "dev": "echo dev-root-ok"
   }
 }
