@@ -4,7 +4,6 @@ client_id = "c107b3c66a61fb6227c2a94ebee29609"
 name = "modo"
 application_url = "https://gardenlife-modo.vercel.app"
 embedded = true
-handle = "modo"
 
 [build]
 automatically_update_urls_on_dev = true
