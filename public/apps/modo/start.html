@@ -31,7 +31,7 @@
     amountText.textContent = amount.toFixed(2);
 
     async function createPaymentIntention() {
-      const url = `/api/modo/payment-request?amount=${encodeURIComponent(amount)}`;
+    const url = `./api/modo/payment-request?amount=${encodeURIComponent(amount)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`PAYMENT_REQUEST_FAIL ${res.status}`);
       const json = await res.json();
