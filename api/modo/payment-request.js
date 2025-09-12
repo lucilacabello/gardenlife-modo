@@ -87,10 +87,12 @@ export default async function handler(req, res) {
 return res.status(200).json({
   id: data.id,
   qr: data.qr,
-  deeplink: data.deeplink,
+  // normaliza: si llega objeto {url: "..."} lo convierte a string
+  deeplink: typeof data.deeplink === 'string' ? data.deeplink : (data.deeplink?.url || null),
   expiration: data.expiration_date || data.expirationDate || data.expiration_at || null,
   created_at: data.created_at || null
 });
+
   } catch (e) {
     return res.status(500).json({
       error: 'SERVER_ERROR',
