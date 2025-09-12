@@ -84,12 +84,13 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({
-      id: data.id,
-      qr: data.qr,
-      deeplink: data.deeplink,
-      expiration: data.expiration_date || data.expirationDate || null,
-    });
+return res.status(200).json({
+  id: data.id,
+  qr: data.qr,
+  deeplink: data.deeplink,
+  expiration: data.expiration_date || data.expirationDate || data.expiration_at || null,
+  created_at: data.created_at || null
+});
   } catch (e) {
     return res.status(500).json({
       error: 'SERVER_ERROR',
