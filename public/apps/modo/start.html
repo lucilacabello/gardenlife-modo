@@ -1,70 +1,49 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Pago con MODO</title>
 <script src="https://ecommerce-modal.modo.com.ar/bundle.js"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px}
-    .wrap{max-width:560px;margin:0 auto}
-    button{padding:12px 16px;border:0;border-radius:8px;cursor:pointer}
-    .muted{color:#666}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>Pago con MODO</h1>
-    <p class="muted">Monto: <span id="amountText">—</span></p>
-    <p>Estamos generando tu QR / deeplink…</p>
-    <div id="status"></div>
-  </div>
+<script>
+  const statusEl = document.getElementById('status');
+  const amountText = document.getElementById('amountText');
 
-  <script>
-    const statusEl = document.getElementById('status');
-    const amountText = document.getElementById('amountText');
+  // lee ?amount= del query (default 10)
+  const params = new URLSearchParams(location.search);
+  const rawAmount = params.get('amount');
+  const amount = Number.isFinite(Number(rawAmount)) ? Number(rawAmount) : 10;
+  amountText.textContent = amount.toFixed(2);
 
-    // lee ?amount= del query (si viene desde el checkout), default 10
-    const params = new URLSearchParams(location.search);
-    const rawAmount = params.get('amount');
-    const amount = Number.isFinite(Number(rawAmount)) ? Number(rawAmount) : 10;
-    amountText.textContent = amount.toFixed(2);
-
-    async function createPaymentIntention() {
+  async function createPaymentIntention() {
     const url = `./api/modo/payment-request?amount=${encodeURIComponent(amount)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`PAYMENT_REQUEST_FAIL ${res.status}`);
-      const json = await res.json();
-      return { checkoutId: json.id, qrString: json.qr, deeplink: json.deeplink };
+    const res = await fetch(url, { method: 'POST' });
+    if (!res.ok) throw new Error(`PAYMENT_REQUEST_FAIL ${res.status}`);
+    const json = await res.json();
+    // El backend debe devolver estos tres campos:
+    // { id, qr, deeplink }
+    return {
+      checkoutId: json.id,
+      qrString: json.qr,
+      deeplink: json.deeplink
+    };
+  }
+
+  (async () => {
+    try {
+      const modalData = await createPaymentIntention();
+      console.log('MODO checkoutId:', modalData.checkoutId);
+
+      const modalObject = {
+        version: '2',
+        checkoutId: modalData.checkoutId,
+        qrString: modalData.qrString,
+        deeplink: { url: modalData.deeplink },
+        callbackURL: `${location.origin}/checkout`,        // tu URL real
+        callbackURLSuccess: `${location.origin}/thankyou`, // tu URL real
+        refreshData: createPaymentIntention
+      };
+
+      statusEl.textContent = 'Abriendo MODO…';
+      ModoSDK.modoInitPayment(modalObject);
+    } catch (e) {
+      statusEl.textContent = 'No pudimos iniciar MODO. Reintentá.';
+      console.error(e);
     }
+  })();
+</script>
 
-    (async () => {
-      try {
-        const modalData = await createPaymentIntention();
-
-        // 👇 LOG clave para verlo en Console
-        console.log('MODO checkoutId:', modalData.checkoutId);
-
-        const modalObject = {
-          version: '2',
-          qrString: modalData.qrString,
-          checkoutId: modalData.checkoutId,
-          deeplink: {
-            url: modalData.deeplink,
-            callbackURL:        `${location.origin}/checkout`,
-            callbackURLSuccess: `${location.origin}/thankyou`
-          },
-          callbackURL: `${location.origin}/thankyou`,
-          refreshData: createPaymentIntention
-        };
-
-        statusEl.textContent = 'Abriendo MODO…';
-        ModoSDK.modoInitPayment(modalObject);
-      } catch (e) {
-        statusEl.textContent = 'No pudimos iniciar MODO. Reintentá.';
-        console.error(e);
-      }
-    })();
-  </script>
-</body>
-</html>
