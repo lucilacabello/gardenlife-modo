@@ -1,4 +1,5 @@
 // /api/shopify/draft-create.js
+// Crea una Draft Order. Acepta ítems de catálogo (variant_id) o custom (title+price).
 
 module.exports = async (req, res) => {
   try {
@@ -13,8 +14,8 @@ module.exports = async (req, res) => {
     }
 
     const {
-      lineItems = [],      // acepta [{ variant_id, quantity, price }] o [{ title, price, quantity }]
-      customer = {},       // { email, first_name, last_name, phone }
+      lineItems = [],       // [{ variant_id, quantity, price }] o [{ title, price, quantity }]
+      customer = {},        // { email, ... }
       shipping_address = {},// { first_name,last_name,address1,city,zip,province,country,phone }
       note,
       tags = ["modo", "qr"]
@@ -24,24 +25,15 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "NO_LINE_ITEMS" });
     }
 
-    // Mapea cada línea según tenga variant_id (producto real) o sea custom (title+price)
     const draftLineItems = lineItems.map((li) => {
       const quantity = li.quantity || 1;
       const price = Number(li.price || 0).toFixed(2);
 
       if (li.variant_id) {
-        return {
-          variant_id: li.variant_id,
-          quantity,
-          price
-        };
+        return { variant_id: li.variant_id, quantity, price };
       }
       // Ítem custom (sin variante)
-      return {
-        title: li.title || "Pago MODO",
-        quantity,
-        price
-      };
+      return { title: li.title || "Pago MODO", quantity, price };
     });
 
     const draftBody = {
@@ -80,4 +72,3 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: "SERVER_ERROR", message: e.message });
   }
 };
-
