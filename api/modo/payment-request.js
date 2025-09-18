@@ -1,4 +1,7 @@
 // /api/modo/payment-request.js  (CommonJS)
+// Crea payment-request en MODO y devuelve { id, qr, deeplink, expiration }.
+// Importante: usa APP_URL para pedir el token aunque la request venga por /apps/modo/...
+
 const crypto = require("crypto");
 
 function shortId(prefix = "GL") {
@@ -7,24 +10,23 @@ function shortId(prefix = "GL") {
   return `${prefix}-${ts}-${rand}`.slice(0, 39);
 }
 
-function getBaseUrl(req) {
-  if (process.env.APP_URL) return process.env.APP_URL;
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers.host;
-  return `${proto}://${host}`;
+function getBaseUrl() {
+  const appUrl = process.env.APP_URL;
+  if (!appUrl) throw new Error("ENV_MISSING APP_URL");
+  return appUrl.replace(/\/+$/,""); // sin barra final
 }
 
 let CACHED_TOKEN = null;
 let CACHED_TOKEN_EXP = 0;
 
-async function getToken(req) {
+async function getToken() {
   if (CACHED_TOKEN && Date.now() < CACHED_TOKEN_EXP) return CACHED_TOKEN;
-  const base = getBaseUrl(req);
+  const base = getBaseUrl();
   const r = await fetch(`${base}/api/modo/token`, { method: "POST" });
   if (!r.ok) throw new Error(`TOKEN_FAIL ${r.status}`);
   const j = await r.json();
   CACHED_TOKEN = j.access_token;
-  CACHED_TOKEN_EXP = Date.now() + 6 * 60 * 60 * 1000;
+  CACHED_TOKEN_EXP = Date.now() + 6 * 60 * 60 * 1000; // 6h
   return CACHED_TOKEN;
 }
 
@@ -35,7 +37,7 @@ function normalizeAmount(v) {
 }
 
 function assertEnv() {
-  const req = ["MODO_BASE_URL","MODO_CC_CODE","MODO_PROCESSOR_CODE","MODO_USER_AGENT","MODO_WEBHOOK_URL"];
+  const req = ["APP_URL","MODO_BASE_URL","MODO_CC_CODE","MODO_PROCESSOR_CODE","MODO_USER_AGENT","MODO_WEBHOOK_URL"];
   const miss = req.filter(k => !process.env[k]);
   if (miss.length) throw new Error(`ENV_MISSING ${miss.join(",")}`);
 }
@@ -48,14 +50,20 @@ module.exports = async function handler(req, res) {
     assertEnv();
 
     const method = req.method || "GET";
-    const rawAmount = method === "POST" ? (req.body && req.body.amount) ?? (req.query && req.query.amount) : (req.query && req.query.amount);
-    const draft_id  = method === "POST" ? (req.body && req.body.draft_id) : (req.query && req.query.draft_id);
+    const rawAmount = method === "POST"
+      ? (req.body && req.body.amount) ?? (req.query && req.query.amount)
+      : (req.query && req.query.amount);
+    const draft_id  = method === "POST"
+      ? (req.body && req.body.draft_id)
+      : (req.query && req.query.draft_id);
 
     const amountNum = normalizeAmount(rawAmount);
-    if (amountNum <= 0) return res.status(400).json({ error: "INVALID_AMOUNT", detail: String(rawAmount) });
+    if (amountNum <= 0) {
+      return res.status(400).json({ error: "INVALID_AMOUNT", detail: String(rawAmount) });
+    }
     const amount = Number(amountNum.toFixed(2));
 
-    const token = await getToken(req);
+    const token = await getToken();
     const base = process.env.MODO_BASE_URL;
 
     const body = {
@@ -69,7 +77,7 @@ module.exports = async function handler(req, res) {
       allowed_payment_methods: ["CARD","ACCOUNT"],
       allowed_schemes: ["VISA","MASTERCARD","AMEX"],
       installments: [1,3,6,12],
-      metadata: { draft_id } // 👈 clave para el webhook
+      metadata: { draft_id } // para completar la Draft al aprobar
       // sin expirationDate (dejamos default de MODO)
     };
 
@@ -92,7 +100,9 @@ module.exports = async function handler(req, res) {
 
     if (debug) console.error("[DEBUG][payment-request][RESPONSE]", { trace, status: r.status, response: data });
 
-    if (!r.ok) return res.status(r.status).json({ error: "PAYMENT_REQUEST_FAIL", status: r.status, trace, detail: data });
+    if (!r.ok) {
+      return res.status(r.status).json({ error: "PAYMENT_REQUEST_FAIL", status: r.status, trace, detail: data });
+    }
 
     return res.status(200).json({
       trace,
