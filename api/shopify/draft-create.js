@@ -1,6 +1,9 @@
 // /api/shopify/draft-create.js
-// Crea una Draft Order. Acepta ítems de catálogo (variant_id) o custom (title+price).
-// Soporta customer, shipping_address, billing_address y shipping_line (envío/retiro).
+// Crea una Draft Order lista para "complete":
+// - customer.email
+// - shipping_address
+// - billing_address (por defecto = shipping_address)
+// - shipping_line (por defecto = { title:"Envío", price:0 })
 
 module.exports = async (req, res) => {
   try {
@@ -19,19 +22,18 @@ module.exports = async (req, res) => {
       customer = {},             // { email, ... }
       shipping_address = {},     // { first_name,last_name,address1,city,zip,province,country,phone }
       billing_address = {},      // idem shipping
-      shipping_line,             // { title, price }  -> para Envío / Retiro
+      shipping_line,             // { title, price }  -> Envío/Retiro (opcional)
       note,
-      tags = ["modo", "qr"]      // puede venir array o string
+      tags = ["modo", "qr"]      // array o string
     } = (req.body || {});
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return res.status(400).json({ error: "NO_LINE_ITEMS" });
     }
 
-    // Normalizar tags (Shopify espera string coma-separado)
+    // --- Normalizaciones ---
     const tagsString = Array.isArray(tags) ? tags.join(", ") : (tags ? String(tags) : "");
 
-    // Mapear líneas
     const draftLineItems = lineItems.map((li) => {
       const quantity = li.quantity || 1;
       const price = Number(li.price || 0).toFixed(2);
@@ -39,11 +41,22 @@ module.exports = async (req, res) => {
       return { title: li.title || "Pago MODO", quantity, price };
     });
 
-    // shipping_lines: si lo mandan lo usamos; si no, omitimos (Shopify lo admite vacío)
-    // Para retiro, enviá { title: "Retiro en tienda", price: 0 }
-    const shippingLines = shipping_line
-      ? [{ title: String(shipping_line.title || "Envío"), price: Number(shipping_line.price || 0) }]
-      : undefined;
+    // Si no mandan billing, usamos el shipping para cumplir requisitos de Shopify
+    const billing = Object.keys(billing_address || {}).length
+      ? billing_address
+      : (Object.keys(shipping_address || {}).length ? shipping_address : undefined);
+
+    // Si no mandan shipping_line, ponemos una por defecto (Envío $0).
+    // Para "Retiro", podés mandar { title:"Retiro en tienda", price:0 } desde el caller.
+    const shippingLineObj = shipping_line && typeof shipping_line === "object"
+      ? {
+          title: String(shipping_line.title || "Envío"),
+          price: Number(shipping_line.price || 0),
+          custom: true
+        }
+      : (Object.keys(shipping_address || {}).length
+          ? { title: "Envío", price: 0, custom: true }
+          : undefined);
 
     const draftBody = {
       draft_order: {
@@ -51,8 +64,8 @@ module.exports = async (req, res) => {
         tags: tagsString,
         customer: customer.email ? { email: customer.email } : undefined,
         shipping_address,
-        billing_address: Object.keys(billing_address || {}).length ? billing_address : undefined,
-        shipping_line: shippingLines ? shippingLines[0] : undefined, // API REST acepta un único objeto
+        billing_address: billing,
+        shipping_line: shippingLineObj, // Shopify REST acepta un único objeto
         line_items: draftLineItems
       }
     };
