@@ -1,4 +1,5 @@
 // /api/modo/payment-request.js
+// Crea la intención de pago y devuelve { id, qr, deeplink, expiration }
 
 import crypto from "crypto";
 
@@ -9,7 +10,7 @@ function shortId(prefix = "GL") {
 }
 
 function getBaseUrl(req) {
-  if (process.env.APP_URL) return process.env.APP_URL;
+  if (process.env.APP_URL) return process.env.APP_URL; // ej: https://gardenlife-modo.vercel.app
   const proto = req.headers["x-forwarded-proto"] || "https";
   const host = req.headers.host;
   return `${proto}://${host}`;
@@ -25,7 +26,7 @@ async function getToken(req) {
   if (!r.ok) throw new Error(`TOKEN_FAIL ${r.status}`);
   const j = await r.json();
   CACHED_TOKEN = j.access_token;
-  CACHED_TOKEN_EXP = Date.now() + 6 * 60 * 60 * 1000;
+  CACHED_TOKEN_EXP = Date.now() + 6 * 60 * 60 * 1000; // 6h
   return CACHED_TOKEN;
 }
 
@@ -69,28 +70,38 @@ export default async function handler(req, res) {
         .json({ error: "INVALID_AMOUNT", detail: String(raw) });
     }
 
-    // MODO/Decidir lo quiere como NUMBER (no string)
-    const amountNumber = Number(amountNum.toFixed(2));
+    // Lo enviamos como NUMBER con 2 decimales
+    const amount = Number(amountNum.toFixed(2));
 
-    // MODO valida una ventana corta (≈5 min). Usamos 4m 30s para ir seguros.
-const expirationDate = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    // EXACTOS 5 minutos desde "ahora"
+    const expirationDate = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     const token = await getToken(req);
     const base = process.env.MODO_BASE_URL;
 
     const body = {
       description: "Compra Gardenlife",
-      amount: amountNumber,                     // <- número (p.ej. 100.00)
+      amount, // number
       currency: "ARS",
       cc_code: process.env.MODO_CC_CODE,
       processor_code: process.env.MODO_PROCESSOR_CODE,
       external_intention_id: shortId(),
       webhook_notification: process.env.MODO_WEBHOOK_URL,
+      // Habilitar tarjetas + CVU
       allowed_payment_methods: ["CARD", "ACCOUNT"],
       allowed_schemes: ["VISA", "MASTERCARD", "AMEX"],
       installments: [1, 3, 6, 12],
-      expirationDate,                           // <- camelCase + ~5 minutos
+      expirationDate, // camelCase y dentro de 5'
     };
+
+    if (debug) {
+      console.error("[DEBUG][payment-request][REQUEST]", {
+        trace,
+        amount,
+        expirationDate,
+        body,
+      });
+    }
 
     const r = await fetch(`${base}/v2/payment-requests/`, {
       method: "POST",
@@ -113,12 +124,9 @@ const expirationDate = new Date(Date.now() + 5 * 60 * 1000).toISOString();
     }
 
     if (debug) {
-      console.error("[MODO][payment-request]", {
+      console.error("[DEBUG][payment-request][RESPONSE]", {
         trace,
         status: r.status,
-        sent_amount_number: amountNumber,
-        expirationDate,
-        request_body: body,
         response: data,
       });
     }
