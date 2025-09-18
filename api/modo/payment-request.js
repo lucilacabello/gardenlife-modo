@@ -77,6 +77,10 @@ export default async function handler(req, res) {
       processor_code: process.env.MODO_PROCESSOR_CODE,
       external_intention_id: shortId(), // FIX: siempre <=39 chars
       webhook_notification: process.env.MODO_WEBHOOK_URL,
+      // 🔑 Campos agregados para habilitar tarjetas
+      allowed_payment_methods: ["CARD", "ACCOUNT"],
+      allowed_schemes: ["VISA", "MASTERCARD"],
+      installments: [1], // ajustá según planes habilitados
       // Opcional:
       // expiration_date: new Date(Date.now() + 9 * 60 * 1000).toISOString(),
       // customer / shipping_address / items ...
