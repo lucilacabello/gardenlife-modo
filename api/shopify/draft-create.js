@@ -1,5 +1,7 @@
 // /api/shopify/draft-create.js
 // Crea una Draft Order. Acepta ítems de catálogo (variant_id) o custom (title+price).
+// Soporta customer, shipping_address, billing_address y shipping_line (envío/retiro).
+
 module.exports = async (req, res) => {
   try {
     if (req.method !== "POST") {
@@ -13,37 +15,44 @@ module.exports = async (req, res) => {
     }
 
     const {
-      lineItems = [],        // [{ variant_id, quantity, price }] o [{ title, price, quantity }]
-      customer = {},         // { email, ... }
-      shipping_address = {}, // { first_name,last_name,address1,city,zip,province,country,phone }
+      lineItems = [],            // [{ variant_id, quantity, price }] o [{ title, price, quantity }]
+      customer = {},             // { email, ... }
+      shipping_address = {},     // { first_name,last_name,address1,city,zip,province,country,phone }
+      billing_address = {},      // idem shipping
+      shipping_line,             // { title, price }  -> para Envío / Retiro
       note,
-      tags = ["modo", "qr"]  // puede venir array o string
+      tags = ["modo", "qr"]      // puede venir array o string
     } = (req.body || {});
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return res.status(400).json({ error: "NO_LINE_ITEMS" });
     }
 
-    // 👉 Normalizamos tags a string coma-separado (Shopify lo requiere como string)
+    // Normalizar tags (Shopify espera string coma-separado)
     const tagsString = Array.isArray(tags) ? tags.join(", ") : (tags ? String(tags) : "");
 
+    // Mapear líneas
     const draftLineItems = lineItems.map((li) => {
       const quantity = li.quantity || 1;
       const price = Number(li.price || 0).toFixed(2);
-
-      if (li.variant_id) {
-        return { variant_id: li.variant_id, quantity, price };
-      }
-      // Ítem custom (sin variante)
+      if (li.variant_id) return { variant_id: li.variant_id, quantity, price };
       return { title: li.title || "Pago MODO", quantity, price };
     });
+
+    // shipping_lines: si lo mandan lo usamos; si no, omitimos (Shopify lo admite vacío)
+    // Para retiro, enviá { title: "Retiro en tienda", price: 0 }
+    const shippingLines = shipping_line
+      ? [{ title: String(shipping_line.title || "Envío"), price: Number(shipping_line.price || 0) }]
+      : undefined;
 
     const draftBody = {
       draft_order: {
         note: note || "Checkout con MODO",
-        tags: tagsString, // 👈 ahora es string
+        tags: tagsString,
         customer: customer.email ? { email: customer.email } : undefined,
         shipping_address,
+        billing_address: Object.keys(billing_address || {}).length ? billing_address : undefined,
+        shipping_line: shippingLines ? shippingLines[0] : undefined, // API REST acepta un único objeto
         line_items: draftLineItems
       }
     };
@@ -57,7 +66,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify(draftBody)
     });
 
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       return res.status(resp.status).json({ error: "DRAFT_CREATE_FAIL", detail: data });
     }
