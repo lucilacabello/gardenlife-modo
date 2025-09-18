@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Pago con MODO</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- SDK MODO -->
   <script src="https://ecommerce-modal.modo.com.ar/bundle.js"></script>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px}
@@ -36,6 +37,7 @@
     const openBtn   = document.getElementById('openModo');
     const doneBtn   = document.getElementById('doneBtn');
 
+    // === Params ===
     const params = new URLSearchParams(location.search);
     const rawAmount = params.get('amount');
     const amountNum = Number(rawAmount);
@@ -43,28 +45,45 @@
     const draftFromQuery = params.get('draft_id');
     amountEl.textContent = amount.toFixed(2);
 
-    // 👇 App Proxy: todo sale por el mismo dominio de la tienda
-    const BASE = ''; // usa /apps/modo/...
+    // === Contexto (checkout extension) ===
+    let ctx = {};
+    try {
+      const b64 = params.get('ctx');
+      if (b64) ctx = JSON.parse(atob(b64));
+    } catch {}
 
-    let draftId   = draftFromQuery || null;
+    // App Proxy base
+    const BASE = ''; // /apps/modo/...
+
+    let draftId    = draftFromQuery || null;
     let checkoutId = null;
     let deeplink   = null;
     let qrString   = null;
 
     function setStatus(msg){ statusEl.textContent = msg || ''; }
-    function showButtons() { if (deeplink) openBtn.style.display='inline-block'; doneBtn.style.display='inline-block'; }
+    function showButtons() {
+      if (deeplink) openBtn.style.display='inline-block';
+      doneBtn.style.display='inline-block';
+    }
 
+    // === 1) Crear Draft Order ===
     async function ensureDraft() {
       if (draftId) return draftId;
       setStatus('Creando borrador del pedido…');
+
+      const payload = {
+        note: 'Pago con MODO',
+        tags: ['modo','qr'],
+        customer: ctx.customer || {},                // { email, first_name, last_name, phone }
+        shipping_address: ctx.shipping_address || {},// { address1, city, zip, province, country, phone }
+        billing_address: ctx.billing_address || {},
+        lineItems: ctx.line_items || [{ title:'Pago MODO', price: amount, quantity: 1 }]
+      };
+
       const r = await fetch(`/apps/modo/api/shopify/draft-create`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({
-          note: 'Pago con MODO',
-          tags: ['modo','qr'],
-          lineItems: [{ title:'Pago MODO', price: amount, quantity: 1 }]
-        })
+        body: JSON.stringify(payload)
       });
       const j = await r.json();
       if (!r.ok) throw new Error(`DRAFT_CREATE_FAIL ${r.status}: ${JSON.stringify(j)}`);
@@ -72,6 +91,7 @@
       return draftId;
     }
 
+    // === 2) Crear intención de pago en MODO ===
     async function createPaymentRequest() {
       setStatus('Creando intención de pago…');
       const r = await fetch(`/apps/modo/api/modo/payment-request`, {
@@ -85,6 +105,7 @@
       return j;
     }
 
+    // === 3) Abrir modal MODO ===
     function openModoModal() {
       if (!checkoutId) return;
       phaseEl.textContent = 'Abriendo MODO…';
@@ -110,11 +131,13 @@
       } finally { showButtons(); }
     }
 
+    // === 4) Ir al success ===
     function goToSuccess() {
       if (!draftId) return alert('Falta draft_id, volvé a intentar.');
       location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
     }
 
+    // === Flow principal ===
     (async () => {
       try {
         await ensureDraft();
@@ -132,3 +155,4 @@
   </script>
 </body>
 </html>
+
