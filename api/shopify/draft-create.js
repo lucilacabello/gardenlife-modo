@@ -1,6 +1,5 @@
 // /api/shopify/draft-create.js
 // Crea una Draft Order. Acepta ítems de catálogo (variant_id) o custom (title+price).
-
 module.exports = async (req, res) => {
   try {
     if (req.method !== "POST") {
@@ -14,16 +13,19 @@ module.exports = async (req, res) => {
     }
 
     const {
-      lineItems = [],       // [{ variant_id, quantity, price }] o [{ title, price, quantity }]
-      customer = {},        // { email, ... }
-      shipping_address = {},// { first_name,last_name,address1,city,zip,province,country,phone }
+      lineItems = [],        // [{ variant_id, quantity, price }] o [{ title, price, quantity }]
+      customer = {},         // { email, ... }
+      shipping_address = {}, // { first_name,last_name,address1,city,zip,province,country,phone }
       note,
-      tags = ["modo", "qr"]
+      tags = ["modo", "qr"]  // puede venir array o string
     } = (req.body || {});
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return res.status(400).json({ error: "NO_LINE_ITEMS" });
     }
+
+    // 👉 Normalizamos tags a string coma-separado (Shopify lo requiere como string)
+    const tagsString = Array.isArray(tags) ? tags.join(", ") : (tags ? String(tags) : "");
 
     const draftLineItems = lineItems.map((li) => {
       const quantity = li.quantity || 1;
@@ -39,7 +41,7 @@ module.exports = async (req, res) => {
     const draftBody = {
       draft_order: {
         note: note || "Checkout con MODO",
-        tags,
+        tags: tagsString, // 👈 ahora es string
         customer: customer.email ? { email: customer.email } : undefined,
         shipping_address,
         line_items: draftLineItems
