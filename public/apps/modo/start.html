@@ -18,6 +18,13 @@
   </style>
 </head>
 <body>
+  <!-- Si alguien abre esto en Vercel, lo mandamos al App Proxy -->
+  <script>
+    if (location.hostname.endsWith('vercel.app')) {
+      location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
+    }
+  </script>
+
   <div class="wrap">
     <h1>Pago con MODO</h1>
     <p class="muted">Monto: <span id="amountText">—</span></p>
@@ -40,17 +47,20 @@
     const openBtn  = document.getElementById('openModo');
     const doneBtn  = document.getElementById('doneBtn');
 
-    // 🔒 URL ABSOLUTA del App Proxy
+    // ✅ URL ABSOLUTA del App Proxy (mismo origen que la tienda)
     const PROXY_BASE = 'https://gardenlife.com.ar/apps/modo';
 
-    // --- Params / contexto opcional desde la Checkout UI Extension ---
+    // --- Params / contexto opcional ---
     const params = new URLSearchParams(location.search);
+
     let ctx = {};
-    try { const b64 = params.get('ctx'); if (b64) ctx = JSON.parse(atob(b64)); } catch {}
+    try {
+      const b64 = params.get('ctx');
+      if (b64) ctx = JSON.parse(atob(b64));
+    } catch {}
 
     // --- Monto ---
-    const rawAmount = params.get('amount');
-    let amount = Number(rawAmount);
+    let amount = Number(params.get('amount'));
     if (!Number.isFinite(amount) || amount <= 0) {
       const ctxTotal = Number(ctx?.total);
       if (Number.isFinite(ctxTotal) && ctxTotal > 0) amount = ctxTotal;
@@ -82,7 +92,7 @@
       catch { return { ok: res.ok, status: res.status, json: null, raw: text }; }
     }
 
-    // --- 1) Crear Draft Order vía App Proxy ---
+    // --- 1) Crear Draft Order (App Proxy) ---
     async function ensureDraft() {
       if (draftId) return draftId;
       setStatus('Creando borrador del pedido…');
@@ -107,7 +117,7 @@
       return draftId;
     }
 
-    // --- 2) Crear intención de pago MODO vía App Proxy ---
+    // --- 2) Crear intención de pago MODO (App Proxy) ---
     async function createPaymentRequest() {
       setStatus('Creando intención de pago…');
       const { ok, status, json, raw } = await fetchJSON(
