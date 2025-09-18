@@ -1,4 +1,5 @@
 // /api/shopify/draft-status.js
+// Devuelve si la Draft Order ya fue completada (=> Order creada/pagada).
 
 module.exports = async (req, res) => {
   try {
