@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8" />
   <title>Pago con MODO</title>
@@ -14,6 +14,7 @@
     .btn{appearance:none;border:0;background:#2E7D32;color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer}
     .btn.secondary{background:#455A64}
     .btn:disabled{opacity:.6;cursor:not-allowed}
+    pre.err{white-space:pre-wrap;background:#fff3f3;border:1px solid #f6caca;border-radius:6px;padding:10px}
   </style>
 </head>
 <body>
@@ -22,6 +23,7 @@
     <p class="muted">Monto: <span id="amountText">—</span></p>
     <p id="phase">Estamos generando tu QR / deeplink…</p>
     <div id="status" class="muted"></div>
+    <pre id="debug" class="err" style="display:none"></pre>
 
     <div class="row">
       <button id="openModo" class="btn" style="display:none">Abrir MODO</button>
@@ -31,42 +33,67 @@
 
   <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const statusEl  = document.getElementById('status');
-    const phaseEl   = document.getElementById('phase');
-    const amountEl  = document.getElementById('amountText');
-    const openBtn   = document.getElementById('openModo');
-    const doneBtn   = document.getElementById('doneBtn');
+    const phaseEl = document.getElementById('phase');
+    const statusEl = document.getElementById('status');
+    const debugEl  = document.getElementById('debug');
+    const amountEl = document.getElementById('amountText');
+    const openBtn  = document.getElementById('openModo');
+    const doneBtn  = document.getElementById('doneBtn');
 
-    // === Params ===
     const params = new URLSearchParams(location.search);
-    const rawAmount = params.get('amount');
-    const amountNum = Number(rawAmount);
-    const amount    = Number.isFinite(amountNum) ? Number(amountNum.toFixed(2)) : 10;
-    const draftFromQuery = params.get('draft_id');
-    amountEl.textContent = amount.toFixed(2);
 
-    // === Contexto (checkout extension) ===
+    // --- Context opcional desde la Checkout UI Extension (base64 JSON) ---
     let ctx = {};
     try {
       const b64 = params.get('ctx');
       if (b64) ctx = JSON.parse(atob(b64));
     } catch {}
 
-    // App Proxy base
-    const BASE = ''; // /apps/modo/...
+    // --- Resolver monto ---
+    const rawAmount = params.get('amount');
+    // si no viene por query, probamos ctx.total (en ARS)
+    let amount = Number(rawAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      const ctxTotal = Number(ctx?.total);
+      if (Number.isFinite(ctxTotal) && ctxTotal > 0) amount = ctxTotal;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) amount = 10; // fallback
+    amount = Number(amount.toFixed(2));
+    amountEl.textContent = amount.toFixed(2);
 
+    // --- Draft (si vino por query, lo respetamos) ---
+    const draftFromQuery = params.get('draft_id');
     let draftId    = draftFromQuery || null;
     let checkoutId = null;
     let deeplink   = null;
     let qrString   = null;
 
-    function setStatus(msg){ statusEl.textContent = msg || ''; }
-    function showButtons() {
-      if (deeplink) openBtn.style.display='inline-block';
-      doneBtn.style.display='inline-block';
+    const showDebug = (txt) => {
+      try {
+        if (typeof txt === 'object') txt = JSON.stringify(txt, null, 2);
+      } catch {}
+      debugEl.style.display = 'block';
+      debugEl.textContent = String(txt).slice(0, 4000);
+    };
+    const setStatus = (msg) => { statusEl.textContent = msg || ''; };
+    const showButtons = () => {
+      if (deeplink) openBtn.style.display = 'inline-block';
+      doneBtn.style.display = 'inline-block';
+    };
+
+    // Util: fetch que intenta parsear JSON y si no, devuelve texto crudo (evita Unexpected token 'T')
+    async function fetchJSON(url, init) {
+      const res = await fetch(url, init);
+      const text = await res.text();
+      try {
+        const json = JSON.parse(text);
+        return { ok: res.ok, status: res.status, json, raw: text };
+      } catch {
+        return { ok: res.ok, status: res.status, json: null, raw: text };
+      }
     }
 
-    // === 1) Crear Draft Order ===
+    // 1) Crear Draft Order (App Proxy)
     async function ensureDraft() {
       if (draftId) return draftId;
       setStatus('Creando borrador del pedido…');
@@ -74,38 +101,50 @@
       const payload = {
         note: 'Pago con MODO',
         tags: ['modo','qr'],
-        customer: ctx.customer || {},                // { email, first_name, last_name, phone }
-        shipping_address: ctx.shipping_address || {},// { address1, city, zip, province, country, phone }
+        customer: ctx.customer || {},                  // { email, first_name, last_name, phone }
+        shipping_address: ctx.shipping_address || {},  // { first_name,last_name,address1,city,zip,province,country,phone }
         billing_address: ctx.billing_address || {},
-        lineItems: ctx.line_items || [{ title:'Pago MODO', price: amount, quantity: 1 }]
+        lineItems: Array.isArray(ctx.line_items) && ctx.line_items.length
+          ? ctx.line_items
+          : [{ title:'Pago MODO', price: amount, quantity: 1 }]
       };
 
-      const r = await fetch(`/apps/modo/api/shopify/draft-create`, {
+      const { ok, status, json, raw } = await fetchJSON('/apps/modo/api/shopify/draft-create', {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify(payload)
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(`DRAFT_CREATE_FAIL ${r.status}: ${JSON.stringify(j)}`);
-      draftId = j.draft_id;
+
+      if (!ok) {
+        showDebug(raw || json);
+        throw new Error(`DRAFT_CREATE_FAIL ${status}`);
+      }
+      draftId = json.draft_id;
       return draftId;
     }
 
-    // === 2) Crear intención de pago en MODO ===
+    // 2) Crear intención de pago MODO (App Proxy)
     async function createPaymentRequest() {
       setStatus('Creando intención de pago…');
-      const r = await fetch(`/apps/modo/api/modo/payment-request`, {
+
+      const { ok, status, json, raw } = await fetchJSON('/apps/modo/api/modo/payment-request?debug=1', {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ amount: amount, draft_id: draftId })
+        body: JSON.stringify({ amount, draft_id: draftId })
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(`PAYMENT_REQUEST_FAIL ${r.status}: ${JSON.stringify(j)}`);
-      checkoutId = j.id; qrString = j.qr; deeplink = j.deeplink;
-      return j;
+
+      if (!ok) {
+        showDebug(raw || json);
+        throw new Error(`PAYMENT_REQUEST_FAIL ${status}`);
+      }
+
+      checkoutId = json.id;
+      qrString   = json.qr;
+      deeplink   = typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null);
+      return json;
     }
 
-    // === 3) Abrir modal MODO ===
+    // 3) Abrir modal MODO
     function openModoModal() {
       if (!checkoutId) return;
       phaseEl.textContent = 'Abriendo MODO…';
@@ -114,30 +153,34 @@
           version: '2',
           checkoutId,
           qrString,
-          deeplink:  deeplink ? { url: deeplink } : undefined,
+          deeplink: deeplink ? { url: deeplink } : undefined,
+          // meramente cosméticas; el modal igual no depende de esto
           callbackURL:        `${location.origin}/cart`,
           callbackURLSuccess: `${location.origin}/`,
           refreshData: async () => {
-            const j = await createPaymentRequest();
+            const r = await createPaymentRequest();
             return {
-              checkoutId: j.id,
-              qrString:   j.qr,
-              deeplink:   j.deeplink ? { url: j.deeplink } : undefined
+              checkoutId: r.id,
+              qrString:   r.qr,
+              deeplink:   r.deeplink ? { url: r.deeplink } : undefined
             };
           }
         });
       } catch (e) {
-        console.error(e); setStatus('No pudimos iniciar MODO. Reintentá.');
-      } finally { showButtons(); }
+        console.error(e);
+        setStatus('No pudimos iniciar MODO. Reintentá.');
+      } finally {
+        showButtons();
+      }
     }
 
-    // === 4) Ir al success ===
+    // 4) Ir al success
     function goToSuccess() {
       if (!draftId) return alert('Falta draft_id, volvé a intentar.');
       location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
     }
 
-    // === Flow principal ===
+    // Flujo principal
     (async () => {
       try {
         await ensureDraft();
@@ -148,11 +191,12 @@
         doneBtn.onclick = goToSuccess;
         openModoModal(); // auto-abrir
       } catch (e) {
-        console.error(e); phaseEl.textContent = 'Error al preparar el pago.'; setStatus(e.message);
+        console.error(e);
+        phaseEl.textContent = 'Error al preparar el pago.';
+        setStatus(e.message);
       }
     })();
   });
   </script>
 </body>
 </html>
-
