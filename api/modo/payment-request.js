@@ -70,18 +70,15 @@ export default async function handler(req, res) {
         .json({ error: "INVALID_AMOUNT", detail: String(raw) });
     }
 
-    // Lo enviamos como NUMBER con 2 decimales
+    // Enviar como NUMBER (2 decimales)
     const amount = Number(amountNum.toFixed(2));
-
-    // EXACTOS 5 minutos desde "ahora"
-    const expirationDate = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     const token = await getToken(req);
     const base = process.env.MODO_BASE_URL;
 
     const body = {
       description: "Compra Gardenlife",
-      amount, // number
+      amount, // number, ej 100.00 -> 100
       currency: "ARS",
       cc_code: process.env.MODO_CC_CODE,
       processor_code: process.env.MODO_PROCESSOR_CODE,
@@ -91,14 +88,13 @@ export default async function handler(req, res) {
       allowed_payment_methods: ["CARD", "ACCOUNT"],
       allowed_schemes: ["VISA", "MASTERCARD", "AMEX"],
       installments: [1, 3, 6, 12],
-      expirationDate, // camelCase y dentro de 5'
+      // 👇 sin expirationDate para evitar desfasajes de reloj del servidor de MODO
     };
 
     if (debug) {
       console.error("[DEBUG][payment-request][REQUEST]", {
         trace,
         amount,
-        expirationDate,
         body,
       });
     }
@@ -108,7 +104,7 @@ export default async function handler(req, res) {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": process.env.MODO_USER_AGENT,
+        "User-Agent": process.env.MODO_USER_AGENT",
         Authorization: `Bearer ${token}`,
         "X-Trace-Id": trace,
       },
