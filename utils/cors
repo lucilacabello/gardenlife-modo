@@ -1,0 +1,17 @@
+// utils/cors.js
+const ALLOWED_ORIGINS = [
+  "https://gardenlife.com.ar",             // tu tienda
+  "https://www.gardenlife.com.ar",
+  "https://admin.shopify.com"              // a veces útil en preview
+];
+
+function cors(res, origin) {
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+}
+
+module.exports = { cors, ALLOWED_ORIGINS };
