@@ -19,7 +19,9 @@ function ModoPay() {
   const { shippingAddress } = useShippingAddress();
   const { deliveryGroups } = useDeliveryGroups();
 
-  const amount = Number(checkout?.totalAmount?.amount ?? 0);
+  // Total en número seguro
+  const rawTotal = Number(checkout?.totalAmount?.amount ?? 0);
+  const amount = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : 0;
 
   // Validaciones
   const hasEmail = !!email?.address;
@@ -34,82 +36,78 @@ function ModoPay() {
     !!sa?.countryCode &&
     (!!sa?.provinceCode || !!sa?.province);
 
-  const hasShippingSelection = (deliveryGroups || []).some(
-    (g) => g?.selectedDeliveryOption?.handle
-  );
+  const hasShippingSelection = Array.isArray(deliveryGroups)
+    ? deliveryGroups.some(g => g?.selectedDeliveryOption?.handle)
+    : false;
 
-  // Detectar si es Retiro en tienda (pickup)
-  const selectedGroup = (deliveryGroups || []).find(
-    (g) => g?.selectedDeliveryOption?.handle
-  );
+  // Detectar retiro (busco “retiro”/“pick up” en título)
+  const selectedGroup = Array.isArray(deliveryGroups)
+    ? deliveryGroups.find(g => g?.selectedDeliveryOption?.handle)
+    : null;
+
+  const optTitle = (selectedGroup?.selectedDeliveryOption?.title || '').toLowerCase();
   const isPickup =
-    selectedGroup?.selectedDeliveryOption?.title
-      ?.toLowerCase()
-      .includes('retiro');
+    optTitle.includes('retiro') ||
+    optTitle.includes('pickup') ||
+    optTitle.includes('retirar');
 
-  // Condición de readiness:
-  // - Siempre requiere email
-  // - Requiere selección de envío/retiro
-  // - Si es envío → dirección obligatoria
-  // - Si es retiro → no pedimos dirección
+  // Readiness: email + (envío o retiro) + si es envío, dirección completa
   const isReady = hasEmail && hasShippingSelection && (isPickup || hasAddress);
 
+  // TIP: si usás JS, cambiá esto a const missing = [];
   const missing: string[] = [];
   if (!hasEmail) missing.push('Ingresá tu email.');
   if (!hasShippingSelection) missing.push('Elegí un método de envío o retiro.');
   if (!isPickup && !hasAddress) missing.push('Completá la dirección de envío.');
 
-  // Empaquetamos datos para pasarlos a start.html
+  // Contexto para start.html (incluye flag de retiro)
   const ctx = btoa(
     JSON.stringify({
       customer: { email: email?.address || '' },
       shipping_address: isPickup
         ? {
             first_name: sa.firstName || '',
-            last_name: sa.lastName || '',
-            address1: 'RETIRO EN TIENDA',
-            city: sa.city || '',
-            zip: sa.postalCode || '',
-            province: sa.provinceCode || sa.province || '',
-            country: sa.countryCode || 'AR',
-            phone: sa.phone || '',
+            last_name:  sa.lastName || '',
+            address1:   'RETIRO EN TIENDA',
+            city:       sa.city || '',
+            zip:        sa.postalCode || '',
+            province:   sa.provinceCode || sa.province || '',
+            country:    sa.countryCode || 'AR',
+            phone:      sa.phone || '',
           }
         : {
             first_name: sa.firstName || '',
-            last_name: sa.lastName || '',
-            address1: sa.address1 || '',
-            address2: sa.address2 || '',
-            city: sa.city || '',
-            zip: sa.postalCode || '',
-            province: sa.provinceCode || sa.province || '',
-            country: sa.countryCode || '',
-            phone: sa.phone || '',
+            last_name:  sa.lastName || '',
+            address1:   sa.address1 || '',
+            address2:   sa.address2 || '',
+            city:       sa.city || '',
+            zip:        sa.postalCode || '',
+            province:   sa.provinceCode || sa.province || '',
+            country:    sa.countryCode || '',
+            phone:      sa.phone || '',
           },
       is_pickup: isPickup,
     })
   );
 
-  const href = `/apps/modo/start.html?amount=${amount.toFixed(
-    2
-  )}&ctx=${encodeURIComponent(ctx)}`;
+  // App Proxy — mismo dominio de la tienda (evita CORS)
+  const href = `/apps/modo/start.html?amount=${amount.toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
 
   return (
     <BlockStack spacing="tight">
       <Text size="medium" emphasis="bold">
-        MODO y Apps Bancarias NO SELECCIONAR. EN PRUEBAS
+        MODO y Apps Bancarias
       </Text>
 
       {!isReady && (
         <>
-          <Banner status="critical" title="Faltan datos para pagar con MODO. NO SELECCIONAR. EN PRUEBAS">
+          <Banner status="critical" title="Faltan datos para pagar con MODO">
             <ul style={{ marginLeft: 16 }}>
-              {missing.map((m) => (
-                <li key={m}>{m}</li>
-              ))}
+              {missing.map(m => <li key={m}>{m}</li>)}
             </ul>
           </Banner>
           <Button kind="primary" disabled>
-            Pagar con MODO. NO SELECCIONAR. EN PRUEBAS
+            Pagar con MODO
           </Button>
         </>
       )}
