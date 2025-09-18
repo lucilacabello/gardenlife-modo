@@ -96,12 +96,12 @@ function ModoPay() {
   return (
     <BlockStack spacing="tight">
       <Text size="medium" emphasis="bold">
-        MODO y Apps Bancarias
+        MODO y Apps Bancarias NO SELECCIONAR. EN PRUEBAS
       </Text>
 
       {!isReady && (
         <>
-          <Banner status="critical" title="Faltan datos para pagar con MODO">
+          <Banner status="critical" title="Faltan datos para pagar con MODO. NO SELECCIONAR. EN PRUEBAS">
             <ul style={{ marginLeft: 16 }}>
               {missing.map((m) => (
                 <li key={m}>{m}</li>
@@ -109,7 +109,7 @@ function ModoPay() {
             </ul>
           </Banner>
           <Button kind="primary" disabled>
-            Pagar con MODO
+            Pagar con MODO. NO SELECCIONAR. EN PRUEBAS
           </Button>
         </>
       )}
