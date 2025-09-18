@@ -31,163 +31,55 @@
     </div>
   </div>
 
-  <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const phaseEl = document.getElementById('phase');
-    const statusEl = document.getElementById('status');
-    const debugEl  = document.getElementById('debug');
-    const amountEl = document.getElementById('amountText');
-    const openBtn  = document.getElementById('openModo');
-    const doneBtn  = document.getElementById('doneBtn');
+<script>
+  // ...
+  // ⚠️ Usá SIEMPRE la URL absoluta de tu App Proxy
+  const PROXY_BASE = 'https://gardenlife.com.ar/apps/modo';
 
-    const params = new URLSearchParams(location.search);
-    const QS = location.search || ''; // 👈 firma del App Proxy
+  async function fetchJSON(url, init) {
+    const res = await fetch(url, init);
+    const text = await res.text();
+    try { return { ok: res.ok, status: res.status, json: JSON.parse(text), raw: text }; }
+    catch { return { ok: res.ok, status: res.status, json: null, raw: text }; }
+  }
 
-    // --- Context opcional desde Checkout UI Extension ---
-    let ctx = {};
-    try {
-      const b64 = params.get('ctx');
-      if (b64) ctx = JSON.parse(atob(b64));
-    } catch {}
+  async function ensureDraft() {
+    if (draftId) return draftId;
+    setStatus('Creando borrador del pedido…');
 
-    // --- Resolver monto ---
-    const rawAmount = params.get('amount');
-    let amount = Number(rawAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      const ctxTotal = Number(ctx?.total);
-      if (Number.isFinite(ctxTotal) && ctxTotal > 0) amount = ctxTotal;
-    }
-    if (!Number.isFinite(amount) || amount <= 0) amount = 10;
-    amount = Number(amount.toFixed(2));
-    amountEl.textContent = amount.toFixed(2);
-
-    // --- Draft (si vino por query, lo respetamos) ---
-    const draftFromQuery = params.get('draft_id');
-    let draftId    = draftFromQuery || null;
-    let checkoutId = null;
-    let deeplink   = null;
-    let qrString   = null;
-
-    const showDebug = (txt) => {
-      try { if (typeof txt === 'object') txt = JSON.stringify(txt, null, 2); } catch {}
-      debugEl.style.display = 'block';
-      debugEl.textContent = String(txt).slice(0, 4000);
-    };
-    const setStatus = (msg) => { statusEl.textContent = msg || ''; };
-    const showButtons = () => {
-      if (deeplink) openBtn.style.display = 'inline-block';
-      doneBtn.style.display = 'inline-block';
+    const payload = {
+      note: 'Pago con MODO',
+      tags: ['modo','qr'],
+      customer: ctx.customer || {},
+      shipping_address: ctx.shipping_address || {},
+      billing_address: ctx.billing_address || {},
+      lineItems: Array.isArray(ctx.line_items) && ctx.line_items.length
+        ? ctx.line_items
+        : [{ title:'Pago MODO', price: amount, quantity: 1 }]
     };
 
-    async function fetchJSON(url, init) {
-      const res = await fetch(url, init);
-      const text = await res.text();
-      try { return { ok: res.ok, status: res.status, json: JSON.parse(text), raw: text }; }
-      catch { return { ok: res.ok, status: res.status, json: null, raw: text }; }
-    }
+    // 👇 Forzado con PROXY_BASE absoluto
+    const { ok, status, json, raw } = await fetchJSON(
+      `${PROXY_BASE}/api/shopify/draft-create`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }
+    );
+    if (!ok) { showDebug(raw || json); throw new Error(`DRAFT_CREATE_FAIL ${status}`); }
+    draftId = json.draft_id; return draftId;
+  }
 
-    // 1) Crear Draft Order
-    async function ensureDraft() {
-      if (draftId) return draftId;
-      setStatus('Creando borrador del pedido…');
+  async function createPaymentRequest() {
+    setStatus('Creando intención de pago…');
+    const { ok, status, json, raw } = await fetchJSON(
+      `${PROXY_BASE}/api/modo/payment-request?debug=1`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amount, draft_id: draftId }) }
+    );
+    if (!ok) { showDebug(raw || json); throw new Error(`PAYMENT_REQUEST_FAIL ${status}`); }
+    checkoutId = json.id; qrString = json.qr; deeplink = typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null);
+    return json;
+  }
+  // ...
+</script>
 
-      const payload = {
-        note: 'Pago con MODO',
-        tags: ['modo','qr'],
-        customer: ctx.customer || {},
-        shipping_address: ctx.shipping_address || {},
-        billing_address: ctx.billing_address || {},
-        lineItems: Array.isArray(ctx.line_items) && ctx.line_items.length
-          ? ctx.line_items
-          : [{ title:'Pago MODO', price: amount, quantity: 1 }]
-      };
-
-      const { ok, status, json, raw } = await fetchJSON(`/apps/modo/api/shopify/draft-create${QS}`, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!ok) {
-        showDebug(raw || json);
-        throw new Error(`DRAFT_CREATE_FAIL ${status}`);
-      }
-      draftId = json.draft_id;
-      return draftId;
-    }
-
-    // 2) Crear Payment Request en MODO
-    async function createPaymentRequest() {
-      setStatus('Creando intención de pago…');
-
-      const { ok, status, json, raw } = await fetchJSON(`/apps/modo/api/modo/payment-request${QS}`, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ amount, draft_id: draftId })
-      });
-
-      if (!ok) {
-        showDebug(raw || json);
-        throw new Error(`PAYMENT_REQUEST_FAIL ${status}`);
-      }
-
-      checkoutId = json.id;
-      qrString   = json.qr;
-      deeplink   = typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null);
-      return json;
-    }
-
-    // 3) Abrir modal MODO
-    function openModoModal() {
-      if (!checkoutId) return;
-      phaseEl.textContent = 'Abriendo MODO…';
-      try {
-        ModoSDK.modoInitPayment({
-          version: '2',
-          checkoutId,
-          qrString,
-          deeplink: deeplink ? { url: deeplink } : undefined,
-          callbackURL:        `${location.origin}/cart`,
-          callbackURLSuccess: `${location.origin}/`,
-          refreshData: async () => {
-            const r = await createPaymentRequest();
-            return {
-              checkoutId: r.id,
-              qrString:   r.qr,
-              deeplink:   r.deeplink ? { url: r.deeplink } : undefined
-            };
-          }
-        });
-      } catch (e) {
-        console.error(e);
-        setStatus('No pudimos iniciar MODO. Reintentá.');
-      } finally { showButtons(); }
-    }
-
-    // 4) Ir a success
-    function goToSuccess() {
-      if (!draftId) return alert('Falta draft_id, volvé a intentar.');
-      location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
-    }
-
-    // Flow principal
-    (async () => {
-      try {
-        await ensureDraft();
-        await createPaymentRequest();
-        phaseEl.textContent = 'Listo. Escaneá el QR o abrí la app MODO.';
-        openBtn.style.display = 'inline-block';
-        openBtn.onclick = () => { if (deeplink) location.href = deeplink; openModoModal(); };
-        doneBtn.onclick = goToSuccess;
-        openModoModal();
-      } catch (e) {
-        console.error(e);
-        phaseEl.textContent = 'Error al preparar el pago.';
-        setStatus(e.message);
-      }
-    })();
-  });
-  </script>
 </body>
 </html>
 
