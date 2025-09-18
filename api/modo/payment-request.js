@@ -88,10 +88,10 @@ export default async function handler(req, res) {
       webhook_notification: process.env.MODO_WEBHOOK_URL,
       // Habilitar tarjetas + cuotas
       allowed_payment_methods: ["CARD", "ACCOUNT"],
-      allowed_schemes: ["VISA", "MASTERCARD", "AMEX"],
-      installments: [1, 3, 6, 12],
+      allowed_schemes: ["VISA", "MASTERCARD"],
+      installments: [1],
       // Evitar expiraciones cortas en pruebas
-      expiration_date: new Date(Date.now() + 9 * 60 * 1000).toISOString(),
+      expiration_date: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     };
 
     const r = await fetch(`${base}/v2/payment-requests/`, {
