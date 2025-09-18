@@ -4,11 +4,10 @@
 import crypto from "crypto";
 
 function shortId(prefix = "GL") {
-  // hash corto en base16 + timestamp base36
   const rand = crypto.randomBytes(8).toString("hex"); // 16 chars
   const ts = Date.now().toString(36);                 // 8-10 chars
   const id = `${prefix}-${ts}-${rand}`;
-  return id.slice(0, 39); // garantiza que nunca supere 39
+  return id.slice(0, 39); // siempre <= 39
 }
 
 function getBaseUrl(req) {
@@ -35,6 +34,7 @@ async function getToken(req) {
 const normalizeAmount = (v) => {
   if (typeof v === "string") v = v.replace(",", ".");
   const n = Number(v);
+  // devolvemos number con 2 decimales (para logs/cálculos internos)
   return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : 0;
 };
 
@@ -51,6 +51,11 @@ function assertEnv() {
 }
 
 export default async function handler(req, res) {
+  const debug = req.query?.debug === "1" || req.body?.debug === 1;
+  const trace = `TRACE-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+
   try {
     assertEnv();
 
@@ -59,31 +64,34 @@ export default async function handler(req, res) {
       method === "POST"
         ? req.body?.amount ?? req.query?.amount
         : req.query?.amount;
-    const amount = normalizeAmount(raw);
-    if (amount <= 0) {
+
+    const amountNum = normalizeAmount(raw);
+    if (amountNum <= 0) {
       return res
         .status(400)
         .json({ error: "INVALID_AMOUNT", detail: String(raw) });
     }
+
+    // El gateway espera "589.00" (string con 2 decimales), no 589 ni 5.89 ni 10
+    const amountStr = amountNum.toFixed(2);
 
     const token = await getToken(req);
     const base = process.env.MODO_BASE_URL;
 
     const body = {
       description: "Compra Gardenlife",
-      amount,
+      amount: amountStr, // <-- FIX: string con 2 decimales
       currency: "ARS",
       cc_code: process.env.MODO_CC_CODE,
       processor_code: process.env.MODO_PROCESSOR_CODE,
-      external_intention_id: shortId(), // FIX: siempre <=39 chars
+      external_intention_id: shortId(), // siempre <=39
       webhook_notification: process.env.MODO_WEBHOOK_URL,
-      // 🔑 Campos agregados para habilitar tarjetas
+      // Habilitar tarjetas + cuotas
       allowed_payment_methods: ["CARD", "ACCOUNT"],
-      allowed_schemes: ["VISA", "MASTERCARD"],
-      installments: [1], // ajustá según planes habilitados
-      // Opcional:
-      // expiration_date: new Date(Date.now() + 9 * 60 * 1000).toISOString(),
-      // customer / shipping_address / items ...
+      allowed_schemes: ["VISA", "MASTERCARD", "AMEX"],
+      installments: [1, 3, 6, 12],
+      // Evitar expiraciones cortas en pruebas
+      expiration_date: new Date(Date.now() + 9 * 60 * 1000).toISOString(),
     };
 
     const r = await fetch(`${base}/v2/payment-requests/`, {
@@ -93,23 +101,43 @@ export default async function handler(req, res) {
         Accept: "application/json",
         "User-Agent": process.env.MODO_USER_AGENT,
         Authorization: `Bearer ${token}`,
+        "X-Trace-Id": trace,
       },
       body: JSON.stringify(body),
     });
 
-    const data = await r.json().catch(() => ({}));
+    const text = await r.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+
+    if (debug) {
+      console.error("[MODO][payment-request]", {
+        trace,
+        status: r.status,
+        sent_amount_num: amountNum,
+        sent_amount_str: amountStr,
+        request_body: body,
+        response: data,
+      });
+    }
+
     if (!r.ok) {
       return res.status(r.status).json({
         error: "PAYMENT_REQUEST_FAIL",
         status: r.status,
+        trace,
         detail: data,
       });
     }
 
     return res.status(200).json({
+      trace,
       id: data.id,
       qr: data.qr,
-      // normaliza: si llega objeto {url: "..."} lo convierte a string
       deeplink:
         typeof data.deeplink === "string"
           ? data.deeplink
@@ -120,10 +148,17 @@ export default async function handler(req, res) {
         data.expiration_at ||
         null,
       created_at: data.created_at || null,
+      ...(debug ? { _debug_request: body, _debug_response: data } : {}),
     });
   } catch (e) {
+    console.error("[MODO][payment-request][ERROR]", {
+      trace,
+      msg: e?.message,
+      stack: e?.stack,
+    });
     return res.status(500).json({
       error: "SERVER_ERROR",
+      trace,
       message: e?.message || "Unexpected",
     });
   }
