@@ -73,7 +73,7 @@ export default async function handler(req, res) {
     const amountNumber = Number(amountNum.toFixed(2));
 
     // MODO valida una ventana corta (≈5 min). Usamos 4m 30s para ir seguros.
-    const expirationDate = new Date(Date.now() + 4.5 * 60 * 1000).toISOString();
+const expirationDate = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     const token = await getToken(req);
     const base = process.env.MODO_BASE_URL;
