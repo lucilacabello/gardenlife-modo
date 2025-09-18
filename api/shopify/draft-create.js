@@ -1,5 +1,4 @@
 // /api/shopify/draft-create.js
-const { cors } = require("../../utils/cors");
 
 module.exports = async (req, res) => {
   cors(res, req.headers.origin || "");
