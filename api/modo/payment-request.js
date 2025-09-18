@@ -1,11 +1,12 @@
 // /api/modo/payment-request.js
-// Crea la intención de pago y devuelve { id, qr, deeplink, expiration }
+// Crea la intención de pago y devuelve { id, qr, deeplink, expiration }.
+// Versión CommonJS (require/module.exports) para evitar el error de ES modules.
 
-import crypto from "crypto";
+const crypto = require("crypto");
 
 function shortId(prefix = "GL") {
-  const rand = crypto.randomBytes(8).toString("hex");
-  const ts = Date.now().toString(36);
+  const rand = crypto.randomBytes(8).toString("hex"); // 16 chars
+  const ts = Date.now().toString(36);                 // 8-10 chars
   return `${prefix}-${ts}-${rand}`.slice(0, 39);
 }
 
@@ -30,11 +31,11 @@ async function getToken(req) {
   return CACHED_TOKEN;
 }
 
-const normalizeAmount = (v) => {
+function normalizeAmount(v) {
   if (typeof v === "string") v = v.replace(",", ".");
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : 0;
-};
+}
 
 function assertEnv() {
   const required = [
@@ -48,7 +49,7 @@ function assertEnv() {
   if (missing.length) throw new Error(`ENV_MISSING ${missing.join(",")}`);
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const debug = req.query?.debug === "1" || req.body?.debug === 1;
   const trace = `TRACE-${Date.now().toString(36)}-${Math.random()
     .toString(36)
@@ -60,8 +61,8 @@ export default async function handler(req, res) {
     const method = req.method || "GET";
     const raw =
       method === "POST"
-        ? req.body?.amount ?? req.query?.amount
-        : req.query?.amount;
+        ? (req.body && req.body.amount) ?? (req.query && req.query.amount)
+        : (req.query && req.query.amount);
 
     const amountNum = normalizeAmount(raw);
     if (amountNum <= 0) {
@@ -88,7 +89,7 @@ export default async function handler(req, res) {
       allowed_payment_methods: ["CARD", "ACCOUNT"],
       allowed_schemes: ["VISA", "MASTERCARD", "AMEX"],
       installments: [1, 3, 6, 12],
-      // 👇 sin expirationDate para evitar desfasajes de reloj del servidor de MODO
+      // (sin expirationDate para evitar 400 por ventana horaria)
     };
 
     if (debug) {
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": process.env.MODO_USER_AGENT",
+        "User-Agent": process.env.MODO_USER_AGENT,
         Authorization: `Bearer ${token}`,
         "X-Trace-Id": trace,
       },
@@ -115,7 +116,7 @@ export default async function handler(req, res) {
     let data;
     try {
       data = JSON.parse(text);
-    } catch {
+    } catch (_) {
       data = { raw: text };
     }
 
@@ -143,7 +144,7 @@ export default async function handler(req, res) {
       deeplink:
         typeof data.deeplink === "string"
           ? data.deeplink
-          : data.deeplink?.url || null,
+          : (data.deeplink && data.deeplink.url) || null,
       expiration:
         data.expiration_date ||
         data.expirationDate ||
@@ -155,13 +156,13 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error("[MODO][payment-request][ERROR]", {
       trace,
-      msg: e?.message,
-      stack: e?.stack,
+      msg: e && e.message,
+      stack: e && e.stack,
     });
     return res.status(500).json({
       error: "SERVER_ERROR",
       trace,
-      message: e?.message || "Unexpected",
+      message: (e && e.message) || "Unexpected",
     });
   }
-}
+};
