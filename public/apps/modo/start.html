@@ -41,8 +41,9 @@
     const doneBtn  = document.getElementById('doneBtn');
 
     const params = new URLSearchParams(location.search);
+    const QS = location.search || ''; // 👈 firma del App Proxy
 
-    // --- Context opcional desde la Checkout UI Extension (base64 JSON) ---
+    // --- Context opcional desde Checkout UI Extension ---
     let ctx = {};
     try {
       const b64 = params.get('ctx');
@@ -51,13 +52,12 @@
 
     // --- Resolver monto ---
     const rawAmount = params.get('amount');
-    // si no viene por query, probamos ctx.total (en ARS)
     let amount = Number(rawAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
       const ctxTotal = Number(ctx?.total);
       if (Number.isFinite(ctxTotal) && ctxTotal > 0) amount = ctxTotal;
     }
-    if (!Number.isFinite(amount) || amount <= 0) amount = 10; // fallback
+    if (!Number.isFinite(amount) || amount <= 0) amount = 10;
     amount = Number(amount.toFixed(2));
     amountEl.textContent = amount.toFixed(2);
 
@@ -69,9 +69,7 @@
     let qrString   = null;
 
     const showDebug = (txt) => {
-      try {
-        if (typeof txt === 'object') txt = JSON.stringify(txt, null, 2);
-      } catch {}
+      try { if (typeof txt === 'object') txt = JSON.stringify(txt, null, 2); } catch {}
       debugEl.style.display = 'block';
       debugEl.textContent = String(txt).slice(0, 4000);
     };
@@ -81,19 +79,14 @@
       doneBtn.style.display = 'inline-block';
     };
 
-    // Util: fetch que intenta parsear JSON y si no, devuelve texto crudo (evita Unexpected token 'T')
     async function fetchJSON(url, init) {
       const res = await fetch(url, init);
       const text = await res.text();
-      try {
-        const json = JSON.parse(text);
-        return { ok: res.ok, status: res.status, json, raw: text };
-      } catch {
-        return { ok: res.ok, status: res.status, json: null, raw: text };
-      }
+      try { return { ok: res.ok, status: res.status, json: JSON.parse(text), raw: text }; }
+      catch { return { ok: res.ok, status: res.status, json: null, raw: text }; }
     }
 
-    // 1) Crear Draft Order (App Proxy)
+    // 1) Crear Draft Order
     async function ensureDraft() {
       if (draftId) return draftId;
       setStatus('Creando borrador del pedido…');
@@ -101,15 +94,15 @@
       const payload = {
         note: 'Pago con MODO',
         tags: ['modo','qr'],
-        customer: ctx.customer || {},                  // { email, first_name, last_name, phone }
-        shipping_address: ctx.shipping_address || {},  // { first_name,last_name,address1,city,zip,province,country,phone }
+        customer: ctx.customer || {},
+        shipping_address: ctx.shipping_address || {},
         billing_address: ctx.billing_address || {},
         lineItems: Array.isArray(ctx.line_items) && ctx.line_items.length
           ? ctx.line_items
           : [{ title:'Pago MODO', price: amount, quantity: 1 }]
       };
 
-      const { ok, status, json, raw } = await fetchJSON('/apps/modo/api/shopify/draft-create', {
+      const { ok, status, json, raw } = await fetchJSON(`/apps/modo/api/shopify/draft-create${QS}`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify(payload)
@@ -123,11 +116,11 @@
       return draftId;
     }
 
-    // 2) Crear intención de pago MODO (App Proxy)
+    // 2) Crear Payment Request en MODO
     async function createPaymentRequest() {
       setStatus('Creando intención de pago…');
 
-      const { ok, status, json, raw } = await fetchJSON('/apps/modo/api/modo/payment-request?debug=1', {
+      const { ok, status, json, raw } = await fetchJSON(`/apps/modo/api/modo/payment-request${QS}`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ amount, draft_id: draftId })
@@ -154,7 +147,6 @@
           checkoutId,
           qrString,
           deeplink: deeplink ? { url: deeplink } : undefined,
-          // meramente cosméticas; el modal igual no depende de esto
           callbackURL:        `${location.origin}/cart`,
           callbackURLSuccess: `${location.origin}/`,
           refreshData: async () => {
@@ -169,18 +161,16 @@
       } catch (e) {
         console.error(e);
         setStatus('No pudimos iniciar MODO. Reintentá.');
-      } finally {
-        showButtons();
-      }
+      } finally { showButtons(); }
     }
 
-    // 4) Ir al success
+    // 4) Ir a success
     function goToSuccess() {
       if (!draftId) return alert('Falta draft_id, volvé a intentar.');
       location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
     }
 
-    // Flujo principal
+    // Flow principal
     (async () => {
       try {
         await ensureDraft();
@@ -189,7 +179,7 @@
         openBtn.style.display = 'inline-block';
         openBtn.onclick = () => { if (deeplink) location.href = deeplink; openModoModal(); };
         doneBtn.onclick = goToSuccess;
-        openModoModal(); // auto-abrir
+        openModoModal();
       } catch (e) {
         console.error(e);
         phaseEl.textContent = 'Error al preparar el pago.';
@@ -200,3 +190,4 @@
   </script>
 </body>
 </html>
+
