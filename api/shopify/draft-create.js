@@ -1,9 +1,6 @@
 // /api/shopify/draft-create.js
 
 module.exports = async (req, res) => {
-  cors(res, req.headers.origin || "");
-  if (req.method === "OPTIONS") return res.status(204).end();
-
   try {
     if (req.method !== "POST") {
       return res.status(405).json({ error: "METHOD_NOT_ALLOWED" });
@@ -51,7 +48,6 @@ module.exports = async (req, res) => {
       draft_order: {
         note: note || "Checkout con MODO",
         tags,
-        // Si pasás email, asociamos el cliente para que la orden final quede vinculada
         customer: customer.email ? { email: customer.email } : undefined,
         shipping_address,
         line_items: draftLineItems
