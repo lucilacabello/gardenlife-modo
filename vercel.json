@@ -1,10 +1,6 @@
 {
   "version": 2,
   "routes": [
-    // Sirve /start.html estático desde /public
-    { "src": "/start.html", "dest": "/start.html" },
-
-    // (Opcional) expone tus serverless en /api/* — Vercel ya lo hace por defecto
     { "src": "/api/(.*)", "dest": "/api/$1" }
   ]
 }
