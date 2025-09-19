@@ -19,9 +19,11 @@ function ModoPay() {
   const { shippingAddress } = useShippingAddress();
   const { deliveryGroups } = useDeliveryGroups();
 
+  // Total seguro
   const rawTotal = Number(checkout?.totalAmount?.amount ?? 0);
   const amount = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : 0;
 
+  // Validaciones
   const hasEmail = !!email?.address;
   const sa = shippingAddress || {};
 
@@ -42,47 +44,55 @@ function ModoPay() {
   const isPickup = optTitle.includes('retiro') || optTitle.includes('pickup') || optTitle.includes('retirar');
 
   const isReady = hasEmail && hasShippingSelection && (isPickup || hasAddress);
+  const isPayable = amount > 0;
+  const canPay = isReady && isPayable;
 
   const missing = [];
   if (!hasEmail) missing.push('Ingresá tu email.');
   if (!hasShippingSelection) missing.push('Elegí un método de envío o retiro.');
   if (!isPickup && !hasAddress) missing.push('Completá la dirección de envío.');
+  if (!isPayable) missing.push('El total debe ser mayor a $0.');
 
-  const ctx = btoa(JSON.stringify({
-    customer: { email: email?.address || '' },
-    shipping_address: isPickup
-      ? {
-          first_name: sa.firstName || '',
-          last_name:  sa.lastName  || '',
-          address1:   'RETIRO EN TIENDA',
-          city:       sa.city || '',
-          zip:        sa.postalCode || '',
-          province:   sa.provinceCode || sa.province || '',
-          country:    sa.countryCode || 'AR',
-          phone:      sa.phone || '',
-        }
-      : {
-          first_name: sa.firstName || '',
-          last_name:  sa.lastName  || '',
-          address1:   sa.address1  || '',
-          address2:   sa.address2  || '',
-          city:       sa.city || '',
-          zip:        sa.postalCode || '',
-          province:   sa.provinceCode || sa.province || '',
-          country:    sa.countryCode || '',
-          phone:      sa.phone || '',
-        },
-    is_pickup: isPickup,
-  }));
+  // Contexto -> base64 UTF-8 safe
+  const ctx = (() => {
+    const payload = {
+      customer: { email: email?.address || '' },
+      shipping_address: isPickup
+        ? {
+            first_name: sa.firstName || '',
+            last_name:  sa.lastName  || '',
+            address1:   'RETIRO EN TIENDA',
+            city:       sa.city || '',
+            zip:        sa.postalCode || '',
+            province:   sa.provinceCode || sa.province || '',
+            country:    sa.countryCode || 'AR',
+            phone:      sa.phone || '',
+          }
+        : {
+            first_name: sa.firstName || '',
+            last_name:  sa.lastName  || '',
+            address1:   sa.address1  || '',
+            address2:   sa.address2  || '',
+            city:       sa.city || '',
+            zip:        sa.postalCode || '',
+            province:   sa.provinceCode || sa.province || '',
+            country:    sa.countryCode || '',
+            phone:      sa.phone || '',
+          },
+      is_pickup: isPickup,
+    };
+    // UTF-8 safe
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  })();
 
-  // ✅ App Proxy absoluto en el mismo dominio de la tienda
+  // App Proxy (mismo dominio)
   const href = `/apps/modo/start.html?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
 
   return (
     <BlockStack spacing="tight">
       <Text size="medium" emphasis="bold">MODO y Apps Bancarias</Text>
 
-      {!isReady ? (
+      {!canPay ? (
         <>
           <Banner status="critical" title="Faltan datos para pagar con MODO">
             <ul style={{ marginLeft: 16 }}>
@@ -92,15 +102,9 @@ function ModoPay() {
           <Button kind="primary" disabled>Pagar con MODO</Button>
         </>
       ) : (
-        // Opción A: abrir con Button (recomendado)
-        <Button kind="primary" onPress={() => window.open(href, "_blank", "noopener")}>
-          Pagar con MODO
-        </Button>
-
-        // Opción B (alternativa): usar Link
-        // <Link to={href} target="_blank">
-        //   <Button kind="primary">Pagar con MODO</Button>
-        // </Link>
+        <Link to={href} target="_blank">
+          <Button kind="primary">Pagar con MODO</Button>
+        </Link>
       )}
     </BlockStack>
   );
