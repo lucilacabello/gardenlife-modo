@@ -19,7 +19,7 @@ function ModoPay() {
   const { shippingAddress } = useShippingAddress();
   const { deliveryGroups } = useDeliveryGroups();
 
-  // Total seguro
+  // Total seguro!
   const rawTotal = Number(checkout?.totalAmount?.amount ?? 0);
   const amount = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : 0;
 
