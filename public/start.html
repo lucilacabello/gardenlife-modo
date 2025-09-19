@@ -15,7 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const doneBtn  = document.getElementById('doneBtn');
 
   // ✅ BASE del App Proxy (sin /api extra en los fetch))
-  const PROXY_BASE = 'https://gardenlife.com.ar/apps/modo';
+  const PROXY_BASE = 'https://gardenlife.com.ar/apps/modo'; // o /apps/modo-pay
+// fetch SIN /api extra:
+`${PROXY_BASE}/shopify/draft-create`
+`${PROXY_BASE}/modo/payment-request?debug=1`
+
 
   const params = new URLSearchParams(location.search);
 
