@@ -91,8 +91,7 @@ function ModoPay() {
   );
 
   // App Proxy — mismo dominio de la tienda (evita CORS)
-const APP_URL = "https://gardenlife-modo.vercel.app";
-const href = `${APP_URL}/start.html?amount=${amount.toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
+const href = `/start.html?amount=${amount.toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
   return (
     <BlockStack spacing="tight">
       <Text size="medium" emphasis="bold">
