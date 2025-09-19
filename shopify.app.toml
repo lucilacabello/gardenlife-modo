@@ -15,7 +15,7 @@ automatically_update_urls_on_dev = true
 api_version = "2025-07"
 
 [access_scopes]
-scopes = "write_products"
+scopes = "read_draft_orders,write_draft_orders,read_customers,read_orders,write_orders"
 
 [auth]
 # ✅ Callbacks derivados de application_url
@@ -30,8 +30,7 @@ embedded = false
 
 # ✅ APP PROXY: esto habilita /apps/modo/... en tu tienda
 [app_proxy]
-# Dónde Shopify debe reenviar las requests del proxy
-url = "https://gardenlife-modo.vercel.app"
-# Ruta pública en la tienda: /apps/<prefix>/<subpath>/...
+url = "https://gardenlife-modo.vercel.app/api"  # ← AGREGAR /api
 prefix = "apps"
 subpath = "modo"
+
