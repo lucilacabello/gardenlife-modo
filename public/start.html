@@ -1,8 +1,8 @@
 
 <script>
-  if (location.hostname.endsWith('vercel.app')) {
-    location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
-  }
+if (location.hostname.endsWith('vercel.app')) {
+  location.href = `https://gardenlife.com.ar/apps/modopay/start${location.search}`;
+}
 </script>
 
 <script>
@@ -15,8 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const doneBtn  = document.getElementById('doneBtn');
 
   // ✅ BASE del App Proxy (sin /api extra en los fetch))
-  const PROXY_BASE = 'https://gardenlife.com.ar/apps/modo'; // o /apps/modo-pay
-// fetch SIN /api extra:
+const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
 `${PROXY_BASE}/shopify/draft-create`
 `${PROXY_BASE}/modo/payment-request?debug=1`
 
