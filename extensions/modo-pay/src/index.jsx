@@ -86,7 +86,7 @@ function ModoPay() {
   })();
 
   // App Proxy (mismo dominio)
-  const href = `/apps/modo/start.html?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
+const href = `/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
 
   return (
     <BlockStack spacing="tight">
