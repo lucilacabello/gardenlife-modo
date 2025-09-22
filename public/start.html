@@ -1,24 +1,21 @@
-
 <script>
-if (location.hostname.endsWith('vercel.app')) {
-  location.href = `https://gardenlife.com.ar/apps/modopay/start${location.search}`;
-}
+  // Si abrís el archivo directo en Vercel, redirige al proxy del dominio público
+  if (location.hostname.endsWith('vercel.app')) {
+    location.href = `https://gardenlife.com.ar/apps/modopay/start${location.search}`;
+  }
 </script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const phaseEl = document.getElementById('phase');
+  const phaseEl  = document.getElementById('phase');
   const statusEl = document.getElementById('status');
   const debugEl  = document.getElementById('debug');
   const amountEl = document.getElementById('amountText');
   const openBtn  = document.getElementById('openModo');
   const doneBtn  = document.getElementById('doneBtn');
 
-  // ✅ BASE del App Proxy (sin /api extra en los fetch))
-const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
-`${PROXY_BASE}/shopify/draft-create`
-`${PROXY_BASE}/modo/payment-request?debug=1`
-
+  // ✅ Base del App Proxy (string, NO función)
+  const PROXY_BASE = '/apps/modopay';
 
   const params = new URLSearchParams(location.search);
 
@@ -36,7 +33,7 @@ const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
   }
   if (!Number.isFinite(amount) || amount <= 0) amount = 10;
   amount = Number(amount.toFixed(2));
-  amountEl.textContent = amount.toFixed(2);
+  if (amountEl) amountEl.textContent = amount.toFixed(2);
 
   const draftFromQuery = params.get('draft_id');
   let draftId    = draftFromQuery || null;
@@ -46,11 +43,16 @@ const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
 
   const showDebug = (txt) => {
     try { if (typeof txt === 'object') txt = JSON.stringify(txt, null, 2); } catch {}
-    debugEl.style.display = 'block';
-    debugEl.textContent = String(txt).slice(0, 4000);
+    if (debugEl) {
+      debugEl.style.display = 'block';
+      debugEl.textContent = String(txt).slice(0, 4000);
+    }
   };
-  const setStatus = (msg) => { statusEl.textContent = msg || ''; };
-  const showButtons = () => { if (deeplink) openBtn.style.display='inline-block'; doneBtn.style.display='inline-block'; };
+  const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg || ''; };
+  const showButtons = () => {
+    if (deeplink && openBtn) openBtn.style.display = 'inline-block';
+    if (doneBtn) doneBtn.style.display = 'inline-block';
+  };
 
   async function fetchJSON(url, init) {
     const res = await fetch(url, init);
@@ -59,7 +61,7 @@ const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
     catch { return { ok: res.ok, status: res.status, json: null, raw: text }; }
   }
 
-  // 1) Draft Order
+  // 1) Crear/asegurar Draft Order
   async function ensureDraft() {
     if (draftId) return draftId;
     setStatus('Creando borrador del pedido…');
@@ -84,7 +86,7 @@ const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
     return draftId;
   }
 
-  // 2) Payment request MODO
+  // 2) Crear intención de pago en MODO
   async function createPaymentRequest() {
     setStatus('Creando intención de pago…');
     const { ok, status, json, raw } = await fetchJSON(
@@ -98,10 +100,10 @@ const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
     return json;
   }
 
-  // 3) Abrir modal MODO
+  // 3) Abrir modal/app de MODO
   function openModoModal() {
     if (!checkoutId) return;
-    phaseEl.textContent = 'Abriendo MODO…';
+    if (phaseEl) phaseEl.textContent = 'Abriendo MODO…';
     try {
       if (!window.ModoSDK || !ModoSDK.modoInitPayment) throw new Error('SDK MODO no disponible');
       ModoSDK.modoInitPayment({
@@ -138,14 +140,16 @@ const PROXY_BASE = '/apps/modopay';// fetch SIN /api extra:
     try {
       await ensureDraft();
       await createPaymentRequest();
-      phaseEl.textContent = 'Listo. Escaneá el QR o abrí la app MODO.';
-      openBtn.style.display = 'inline-block';
-      openBtn.onclick = () => { if (deeplink) location.href = deeplink; openModoModal(); };
-      doneBtn.onclick = goToSuccess;
+      if (phaseEl) phaseEl.textContent = 'Listo. Escaneá el QR o abrí la app MODO.';
+      if (openBtn) {
+        openBtn.style.display = 'inline-block';
+        openBtn.onclick = () => { if (deeplink) location.href = deeplink; openModoModal(); };
+      }
+      if (doneBtn) doneBtn.onclick = goToSuccess;
       openModoModal(); // auto-abrir
     } catch (e) {
       console.error(e);
-      phaseEl.textContent = 'Error al preparar el pago.';
+      if (phaseEl) phaseEl.textContent = 'Error al preparar el pago.';
       setStatus(e.message);
     }
   })();
