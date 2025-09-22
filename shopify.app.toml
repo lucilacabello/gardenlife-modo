@@ -2,8 +2,6 @@
 
 client_id = "44d5b4da30178eb0a61c04c874a79f64"
 name = "gardenlife_modo"
-
-# ✅ PRODUCCIÓN: tu app hosteada en Vercel
 application_url = "https://gardenlife-modo.vercel.app"
 embedded = true
 handle = "gardenlife_modo"
@@ -15,10 +13,10 @@ automatically_update_urls_on_dev = true
 api_version = "2025-07"
 
 [access_scopes]
-scopes = "read_draft_orders,write_draft_orders,read_customers,read_orders,write_orders"
+# Agregamos write_app_proxy
+scopes = "read_draft_orders,write_draft_orders,read_customers,read_orders,write_orders,write_app_proxy"
 
 [auth]
-# ✅ Callbacks derivados de application_url
 redirect_urls = [
   "https://gardenlife-modo.vercel.app/auth/callback",
   "https://gardenlife-modo.vercel.app/auth/shopify/callback",
@@ -28,9 +26,9 @@ redirect_urls = [
 [pos]
 embedded = false
 
-# ✅ APP PROXY: esto habilita /apps/modo/... en tu tienda
 [app_proxy]
-url = "https://gardenlife-modo.vercel.app/api"  # ← AGREGAR /api
+# ❌ antes: url = "https://gardenlife-modo.vercel.app/api"
+# ✅ ahora: sin /api
+url    = "https://gardenlife-modo.vercel.app"
 prefix = "apps"
 subpath = "modo"
-
