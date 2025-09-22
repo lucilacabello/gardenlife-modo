@@ -1,6 +1,17 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" }
+    {
+      "src": "/apps/modo/start.html",
+      "dest": "/start.html"
+    },
+    {
+      "src": "/apps/modo/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
   ]
 }
