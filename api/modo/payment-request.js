@@ -42,6 +42,10 @@ function assertEnv() {
   if (miss.length) throw new Error(`ENV_MISSING ${miss.join(",")}`);
 }
 
+// === MiPyME ===
+const MIPYME_CODE_BY_QTY = { 3: 13, 6: 16 };
+const toMiPymeCode = qty => MIPYME_CODE_BY_QTY[qty] || null;
+
 module.exports = async function handler(req, res) {
   const debug = req.query?.debug === "1" || req.body?.debug === 1;
   const trace = `TRACE-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
@@ -53,9 +57,18 @@ module.exports = async function handler(req, res) {
     const rawAmount = method === "POST"
       ? (req.body && req.body.amount) ?? (req.query && req.query.amount)
       : (req.query && req.query.amount);
+
     const draft_id  = method === "POST"
       ? (req.body && req.body.draft_id)
       : (req.query && req.query.draft_id);
+
+    // cuotas MiPyME deseadas (0|3|6)
+    const mipyme_installments = Number(
+      method === "POST"
+        ? (req.body && req.body.mipyme_installments)
+        : (req.query && req.query.mipyme_installments)
+    ) || 0;
+    const mipyme_code = toMiPymeCode(mipyme_installments);
 
     const amountNum = normalizeAmount(rawAmount);
     if (amountNum <= 0) {
@@ -66,9 +79,12 @@ module.exports = async function handler(req, res) {
     const token = await getToken();
     const base = process.env.MODO_BASE_URL;
 
+    // cuotas disponibles
+    const allowedInstallments = [1, 3, 6, 12];
+
     const body = {
       description: "Compra Gardenlife",
-      amount, // number
+      amount,
       currency: "ARS",
       cc_code: process.env.MODO_CC_CODE,
       processor_code: process.env.MODO_PROCESSOR_CODE,
@@ -76,9 +92,29 @@ module.exports = async function handler(req, res) {
       webhook_notification: process.env.MODO_WEBHOOK_URL,
       allowed_payment_methods: ["CARD","ACCOUNT"],
       allowed_schemes: ["VISA","MASTERCARD","AMEX"],
-      installments: [1,3,6,12],
-      metadata: { draft_id } // para completar la Draft al aprobar
-      // sin expirationDate (dejamos default de MODO)
+      installments: allowedInstallments,
+
+      // trazabilidad MiPyME
+      ...(mipyme_installments ? {
+        installments_detail: {
+          plan: "MiPyME",
+          quantity: mipyme_installments, // 3 o 6
+          option_code: mipyme_code       // 13 o 16
+        }
+      } : {}),
+
+      // hint para adquirente (si aplica)
+      ...(mipyme_code ? {
+        gateway_extra:   { installments_option: mipyme_code },
+        acquirer_extra:  { installments_option: mipyme_code },
+        processor_data:  { installments_option: mipyme_code }
+      } : {}),
+
+      metadata: {
+        draft_id,
+        gl_mipyme_qty: mipyme_installments || 0,
+        gl_mipyme_option_code: mipyme_code || 0
+      }
     };
 
     if (debug) console.error("[DEBUG][payment-request][REQUEST]", { trace, amount, body });
@@ -88,7 +124,7 @@ module.exports = async function handler(req, res) {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "User-Agent": process.env.MODO_USER_AGENT,
+        "User-Agent": process.env.MODO_USER_AGENT, // usar NOMBRE REAL del comercio
         "Authorization": `Bearer ${token}`,
         "X-Trace-Id": trace
       },
@@ -118,3 +154,4 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: "SERVER_ERROR", trace, message: e.message || "Unexpected" });
   }
 };
+
