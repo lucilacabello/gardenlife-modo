@@ -1,7 +1,9 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "c107b3c66a61fb6227c2a94ebee29609"
+client_id = "653a5253a7ef9c0ac99a7cb24e024c99"
 name = "modo"
+handle = "modo"
+
 application_url = "https://gardenlife-modo.vercel.app"
 embedded = true
 
@@ -12,10 +14,8 @@ automatically_update_urls_on_dev = true
 api_version = "2025-07"
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
-optional_scopes = [ ]
-use_legacy_install_flow = false
+# incluimos write_app_proxy
+scopes = "read_draft_orders,write_draft_orders,read_customers,read_orders,write_orders,write_app_proxy"
 
 [auth]
 redirect_urls = [
@@ -24,7 +24,11 @@ redirect_urls = [
   "https://gardenlife-modo.vercel.app/api/auth/callback"
 ]
 
+[pos]
+embedded = false
+
+# App Proxy sin /api
 [app_proxy]
-url = "https://gardenlife-modo.vercel.app"
-subpath = "modo"
+url    = "https://gardenlife-modo.vercel.app"
 prefix = "apps"
+subpath = "modo"

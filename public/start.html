@@ -1,0 +1,181 @@
+<!-- SDK de MODO (PROD). Cambiá a preprod si corresponde -->
+<script src="https://ecommerce-modal.modo.com.ar/bundle.js"></script>
+
+<script>
+  // Si abrís el archivo directo en Vercel, redirige al proxy del dominio público
+  if (location.hostname.endsWith('vercel.app')) {
+    location.href = `https://gardenlife.com.ar/apps/modopay/start${location.search}`;
+  }
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const phaseEl  = document.getElementById('phase');
+  const statusEl = document.getElementById('status');
+  const debugEl  = document.getElementById('debug');
+  const amountEl = document.getElementById('amountText');
+  const openBtn  = document.getElementById('openModo');
+  const doneBtn  = document.getElementById('doneBtn');
+
+  // ✅ Base del App Proxy (string, NO función)
+  const PROXY_BASE = '/apps/modopay';
+
+  // Loader: asegura que el SDK de MODO esté disponible antes de usarlo
+  const MODO_SDK_URL = 'https://ecommerce-modal.modo.com.ar/bundle.js'; // o preprod
+  function loadModoSdk() {
+    return new Promise((resolve, reject) => {
+      if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') return resolve();
+      const s = document.createElement('script');
+      s.src = MODO_SDK_URL; s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('No se pudo cargar el SDK de MODO'));
+      document.head.appendChild(s);
+    });
+  }
+
+  const params = new URLSearchParams(location.search);
+
+  let ctx = {};
+  try {
+    const b64 = params.get('ctx');
+    if (b64) ctx = JSON.parse(decodeURIComponent(escape(atob(b64))));
+  } catch {}
+
+  // --- Monto ---
+  let amount = Number(params.get('amount'));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    const ctxTotal = Number(ctx?.total);
+    if (Number.isFinite(ctxTotal) && ctxTotal > 0) amount = ctxTotal;
+  }
+  if (!Number.isFinite(amount) || amount <= 0) amount = 10;
+  amount = Number(amount.toFixed(2));
+  if (amountEl) amountEl.textContent = amount.toFixed(2);
+
+  const draftFromQuery = params.get('draft_id');
+  let draftId    = draftFromQuery || null;
+  let checkoutId = null;
+  let deeplink   = null;
+  let qrString   = null;
+
+  const showDebug = (txt) => {
+    try { if (typeof txt === 'object') txt = JSON.stringify(txt, null, 2); } catch {}
+    if (debugEl) {
+      debugEl.style.display = 'block';
+      debugEl.textContent = String(txt).slice(0, 4000);
+    }
+  };
+  const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg || ''; };
+  const showButtons = () => {
+    if (openBtn) openBtn.style.display = 'inline-block';
+    if (doneBtn) doneBtn.style.display = 'inline-block';
+  };
+
+  async function fetchJSON(url, init) {
+    const res = await fetch(url, init);
+    const text = await res.text();
+    try { return { ok: res.ok, status: res.status, json: JSON.parse(text), raw: text }; }
+    catch { return { ok: res.ok, status: res.status, json: null, raw: text }; }
+  }
+
+  // 1) Crear/asegurar Draft Order
+  async function ensureDraft() {
+    if (draftId) return draftId;
+    setStatus('Creando borrador del pedido…');
+
+    const payload = {
+      note: 'Pago con MODO',
+      tags: ['modo','qr'],
+      customer: ctx.customer || {},
+      shipping_address: ctx.shipping_address || {},
+      billing_address: ctx.billing_address || {},
+      lineItems: Array.isArray(ctx.line_items) && ctx.line_items.length
+        ? ctx.line_items
+        : [{ title:'Pago MODO', price: amount, quantity: 1 }]
+    };
+
+    const { ok, status, json, raw } = await fetchJSON(
+      `${PROXY_BASE}/shopify/draft-create`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }
+    );
+    if (!ok) { showDebug(raw || json); throw new Error(`DRAFT_CREATE_FAIL ${status}`); }
+    draftId = json.draft_id;
+    return draftId;
+  }
+
+  // 2) Crear intención de pago en MODO
+  async function createPaymentRequest() {
+    setStatus('Creando intención de pago…');
+    const { ok, status, json, raw } = await fetchJSON(
+      `${PROXY_BASE}/modo/payment-request?debug=1`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amount, draft_id: draftId }) }
+    );
+    if (!ok) { showDebug(raw || json); throw new Error(`PAYMENT_REQUEST_FAIL ${status}`); }
+    checkoutId = json.id;
+    qrString   = json.qr;
+    deeplink   = typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null);
+    return json;
+  }
+
+  // 3) Abrir modal/app de MODO (con fallback por deeplink)
+  function openModoModal() {
+    if (!checkoutId) return;
+    if (phaseEl) phaseEl.textContent = 'Abriendo MODO…';
+    try {
+      if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
+        ModoSDK.modoInitPayment({
+          version: '2',
+          checkoutId,
+          qrString,
+          deeplink: deeplink ? { url: deeplink } : undefined,
+          callbackURL:        `${location.origin}/cart`,
+          callbackURLSuccess: `${location.origin}/`,
+          refreshData: async () => {
+            const r = await createPaymentRequest();
+            return {
+              checkoutId: r.id,
+              qrString:   r.qr,
+              deeplink:   r.deeplink ? { url: r.deeplink } : undefined
+            };
+          }
+        });
+      } else {
+        // Fallback sin SDK: abrir por deeplink
+        if (deeplink) {
+          setStatus('Abriendo app MODO…');
+          location.href = deeplink;
+        } else {
+          setStatus('SDK MODO no disponible. Reintentá.');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      setStatus('No pudimos iniciar MODO. Reintentá.');
+      showDebug(e?.message || e);
+    } finally {
+      showButtons();
+    }
+  }
+
+  function goToSuccess() {
+    if (!draftId) return alert('Falta draft_id, volvé a intentar.');
+    location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
+  }
+
+  (async () => {
+    try {
+      await ensureDraft();
+      await createPaymentRequest();
+      await loadModoSdk(); // ⬅️ esperamos el SDK
+      if (phaseEl) phaseEl.textContent = 'Listo. Escaneá el QR o abrí la app MODO.';
+      if (openBtn) openBtn.onclick = () => { if (deeplink) location.href = deeplink; openModoModal(); };
+      if (doneBtn) doneBtn.onclick = goToSuccess;
+      openModoModal(); // auto-abrir
+    } catch (e) {
+      console.error(e);
+      if (phaseEl) phaseEl.textContent = 'Error al preparar el pago.';
+      setStatus(e.message);
+      showButtons();
+    }
+  })();
+});
+</script>

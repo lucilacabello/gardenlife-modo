@@ -1,27 +1,30 @@
 // /api/modo/token.js
-// Genera y cachea el token de MODO por ~7 días (TTL real: 604800 s)
+// Devuelve { access_token, expires_in } desde MODO PROD
 
-let cache = { token: null, exp: 0 };
+function assertEnv() {
+  const required = ['MODO_BASE_URL','MODO_USER_AGENT','MODO_USERNAME','MODO_PASSWORD'];
+  const missing = required.filter(k => !process.env[k]);
+  if (missing.length) throw new Error(`ENV_MISSING ${missing.join(',')}`);
+}
 
 export default async function handler(req, res) {
   try {
-    const now = Date.now();
-    if (cache.token && now < cache.exp) {
-      return res.status(200).json({ access_token: cache.token, cached: true });
+    assertEnv();
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
 
-    const base = process.env.MODO_BASE_URL; // ej: https://merchants.preprod.playdigital.com.ar
-    const r = await fetch(`${base}/v2/stores/companies/token`, {
+    const r = await fetch(`${process.env.MODO_BASE_URL}/v2/stores/companies/token`, {
       method: 'POST',
       headers: {
+        'User-Agent': process.env.MODO_USER_AGENT,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': process.env.MODO_USER_AGENT, // OBLIGATORIO
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
-        username: process.env.MODO_USERNAME,
-        password: process.env.MODO_PASSWORD,
-      }),
+        username: process.env.MODO_USERNAME,   // ej: GARDENLIFESA-373602-production
+        password: process.env.MODO_PASSWORD
+      })
     });
 
     const data = await r.json().catch(() => ({}));
@@ -29,13 +32,9 @@ export default async function handler(req, res) {
       return res.status(r.status).json({ error: 'TOKEN_FAIL', detail: data });
     }
 
-    // Guardar en cache (TTL 7 días)
-    const ttlMs = (Number(data.expires_in || 604800) * 1000) - 60_000; // 1 min colchón
-    cache = { token: data.access_token, exp: now + ttlMs };
-
-    return res.status(200).json({ access_token: data.access_token, expires_in: data.expires_in });
+    // data: { access_token, expires_in: 604800, ... }
+    return res.status(201).json({ access_token: data.access_token, expires_in: data.expires_in });
   } catch (e) {
     return res.status(500).json({ error: 'SERVER_ERROR', message: e?.message || 'Unexpected' });
   }
 }
-
