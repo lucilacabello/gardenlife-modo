@@ -19,11 +19,21 @@ function ModoPay() {
   const { shippingAddress } = useShippingAddress();
   const { deliveryGroups } = useDeliveryGroups();
 
-  // Total seguro!
+  // --- Config básica ---
+  // Forzamos .myshopify.com para que el proxy siempre resuelva, aunque el checkout esté en dominio custom
+  const SHOP_DOMAIN = checkout?.shop?.myshopifyDomain || 'gardenlife.myshopify.com';
+
+  // (Opcional) ventana de promo Cyber Monday
+  const now = new Date();
+  const promo = now >= new Date('2025-11-30T00:00:00-03:00') && now <= new Date('2025-12-02T23:59:59-03:00');
+  const REINTEGRO = 20;
+  const btnLabel = promo ? `Pagar con MODO — ${REINTEGRO}% de reintegro` : 'Pagar con MODO';
+
+  // --- Monto seguro ---
   const rawTotal = Number(checkout?.totalAmount?.amount ?? 0);
   const amount = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : 0;
 
-  // Validaciones
+  // --- Validaciones de datos del checkout ---
   const hasEmail = !!email?.address;
   const sa = shippingAddress || {};
 
@@ -53,7 +63,7 @@ function ModoPay() {
   if (!isPickup && !hasAddress) missing.push('Completá la dirección de envío.');
   if (!isPayable) missing.push('El total debe ser mayor a $0.');
 
-  // Contexto -> base64 UTF-8 safe
+  // --- Contexto para backend (UTF-8 safe Base64) ---
   const ctx = (() => {
     const payload = {
       customer: { email: email?.address || '' },
@@ -81,16 +91,21 @@ function ModoPay() {
           },
       is_pickup: isPickup,
     };
-    // UTF-8 safe
     return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   })();
 
-  // App Proxy (mismo dominio)
-const href = `/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
+  // --- App Proxy: forzar dominio .myshopify.com (limpio y robusto) ---
+  const href = `https://${SHOP_DOMAIN}/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
 
   return (
     <BlockStack spacing="tight">
       <Text size="medium" emphasis="bold">MODO y Apps Bancarias</Text>
+
+      {promo && (
+        <Banner status="info" title="Promo Cyber Monday">
+          Pagá con MODO y recibí {REINTEGRO}% de reintegro. Válido por tiempo limitado.
+        </Banner>
+      )}
 
       {!canPay ? (
         <>
@@ -99,11 +114,11 @@ const href = `/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&
               {missing.map(m => <li key={m}>{m}</li>)}
             </ul>
           </Banner>
-          <Button kind="primary" disabled>Pagar con MODO — 20% de reintegro</Button>
+          <Button kind="primary" disabled>{btnLabel}</Button>
         </>
       ) : (
         <Link to={href} target="_blank">
-          <Button kind="primary">Pagar con MODO — 20% de reintegro</Button>
+          <Button kind="primary">{btnLabel}</Button>
         </Link>
       )}
     </BlockStack>
