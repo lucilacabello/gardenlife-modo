@@ -80,7 +80,7 @@ module.exports = async function handler(req, res) {
     const base = process.env.MODO_BASE_URL;
 
     // cuotas disponibles
-    const allowedInstallments = [1, 3, 6, 12];
+    const allowedInstallments = [1, 3, 6];
 
     const body = {
       description: "Compra Gardenlife",
@@ -91,7 +91,7 @@ module.exports = async function handler(req, res) {
       external_intention_id: shortId(),
       webhook_notification: process.env.MODO_WEBHOOK_URL,
       allowed_payment_methods: ["CARD","ACCOUNT"],
-      allowed_schemes: ["VISA","MASTERCARD","AMEX"],
+      allowed_schemes: ["VISA","MASTERCARD"],
       installments: allowedInstallments,
 
       // trazabilidad MiPyME
