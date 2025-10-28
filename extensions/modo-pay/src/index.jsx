@@ -99,11 +99,11 @@ const href = `/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&
               {missing.map(m => <li key={m}>{m}</li>)}
             </ul>
           </Banner>
-          <Button kind="primary" disabled>Pagar con MODO</Button>
+          <Button kind="primary" disabled>Pagar con MODO — 20% de reintegro</Button>
         </>
       ) : (
         <Link to={href} target="_blank">
-          <Button kind="primary">Pagar con MODO</Button>
+          <Button kind="primary">Pagar con MODO — 20% de reintegro</Button>
         </Link>
       )}
     </BlockStack>
