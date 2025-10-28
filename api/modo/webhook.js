@@ -1,7 +1,7 @@
-// /api/modo-webhook.js
-// Plan A: intentar /complete.json
-// Plan B: si 406 (u otro), crear la Order directamente desde la Draft y borrar la Draft.
-// + Conciliación MODO: consulta /v2/payment-requests/{id}/data y guarda en metafields de la orden.
+// /api/modo/webhook.js
+// Plan A: /complete.json
+// Plan B: crear Order desde Draft y borrar Draft
+// + Conciliación MODO: /v2/payment-requests/{id}/data → metafields en la Order
 
 export default async function handler(req, res) {
   const trace = `W-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
@@ -18,21 +18,29 @@ export default async function handler(req, res) {
     console.log("[MODO][WEBHOOK][IN]", trace, JSON.stringify(payload));
 
     const status = String(payload.status || "").toUpperCase();
-    const draft_id = payload?.metadata?.draft_id;
+    const draft_id_raw = payload?.metadata?.draft_id;
+    const draft_id = String(draft_id_raw ?? "").replace(/\D/g, ""); // solo dígitos
     const paymentRequestId =
       payload.payment_request_id || payload.id || payload.paymentRequestId || payload.payment_requestId || payload?.metadata?.payment_request_id;
 
     if (!draft_id) {
+      console.log("[MODO][WEBHOOK] Missing draft_id in metadata", trace);
       return res.status(400).json({ error: "MISSING_DRAFT_ID_IN_METADATA" });
     }
-    if (status !== "APPROVED") {
+
+    // ✅ Acepta múltiples estados “pagado”
+    const OK_STATUSES = new Set(["COMPLETED","APPROVED","CONFIRMED","SUCCESS","CAPTURED"]);
+    if (!OK_STATUSES.has(status)) {
+      console.log("[MODO][WEBHOOK] Ignored (status not final):", status, trace);
       return res.status(200).json({ ok: true, ignored: true, status, draft_id });
     }
 
     // ---------- ENV Shopify ----------
-    const shop  = process.env.SHOPIFY_SHOP;
+    // Admite SHOPIFY_STORE (subdominio) o SHOPIFY_SHOP (host completo)
+    const storeSub = process.env.SHOPIFY_STORE || (process.env.SHOPIFY_SHOP || "").replace(/\.myshopify\.com$/,"");
+    const shopHost = `${storeSub}.myshopify.com`;
     const token = process.env.SHOPIFY_ADMIN_TOKEN;
-    if (!shop || !token) {
+    if (!storeSub || !token) {
       return res.status(500).json({ error: "ENV_MISSING_SHOPIFY" });
     }
 
@@ -64,7 +72,7 @@ export default async function handler(req, res) {
       return data;
     };
     const setOrderMetafields = async ({ orderId, fields }) => {
-      const endpoint = `https://${shop}/admin/api/2024-10/graphql.json`;
+      const endpoint = `https://${shopHost}/admin/api/2024-10/graphql.json`;
       const metafields = [
         { namespace: "modo", key: "payment_request_id", value: String(fields.payment_request_id || ""), type: "single_line_text_field" },
         { namespace: "modo", key: "status", value: String(fields.modo_status || ""), type: "single_line_text_field" },
@@ -83,10 +91,7 @@ export default async function handler(req, res) {
           }
         }
       `;
-      const variables = {
-        ownerId: `gid://shopify/Order/${orderId}`,
-        metafields
-      };
+      const variables = { ownerId: `gid://shopify/Order/${orderId}`, metafields };
       const r = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -105,7 +110,7 @@ export default async function handler(req, res) {
     assertEnv();
 
     // ---------- (1) Completar Draft: PLAN A ----------
-    const completeUrl = `https://${shop}/admin/api/2024-10/draft_orders/${draft_id}/complete.json`;
+    const completeUrl = `https://${shopHost}/admin/api/2024-10/draft_orders/${draft_id}/complete.json`;
     console.log("[SHOPIFY][DRAFT_COMPLETE][REQ]", trace, completeUrl);
     let resp = await fetch(completeUrl, {
       method: "POST",
@@ -113,7 +118,8 @@ export default async function handler(req, res) {
         "X-Shopify-Access-Token": token,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ payment_pending: false }) // ya cobrado por MODO
+      // ya cobrado por MODO → no pending
+      body: JSON.stringify({ payment_pending: false })
     });
 
     let data = {};
@@ -130,7 +136,7 @@ export default async function handler(req, res) {
       console.log("[WEBHOOK] Plan A falló, vamos a Plan B (crear Order manual).", trace);
 
       // 2.1 Leer la Draft
-      const getDraftUrl = `https://${shop}/admin/api/2024-10/draft_orders/${draft_id}.json`;
+      const getDraftUrl = `https://${shopHost}/admin/api/2024-10/draft_orders/${draft_id}.json`;
       const dRes = await fetch(getDraftUrl, {
         headers: { "X-Shopify-Access-Token": token }
       });
@@ -157,7 +163,7 @@ export default async function handler(req, res) {
           billing_address: draft.billing_address || draft.shipping_address || undefined,
           shipping_address: draft.shipping_address || undefined,
           tags: draft.tags ? `${draft.tags}, modo, qr` : "modo, qr",
-          note: draft.note || "Pago con MODO",
+          note: (draft.note ? `${draft.note} · ` : "") + `Pago con MODO (trace=${trace})`,
           financial_status: "paid",
           transactions: [
             {
@@ -170,7 +176,7 @@ export default async function handler(req, res) {
         }
       };
 
-      const createOrderUrl = `https://${shop}/admin/api/2024-10/orders.json`;
+      const createOrderUrl = `https://${shopHost}/admin/api/2024-10/orders.json`;
       console.log("[SHOPIFY][ORDER_CREATE][REQ]", trace, createOrderUrl);
       const oRes = await fetch(createOrderUrl, {
         method: "POST",
@@ -190,7 +196,7 @@ export default async function handler(req, res) {
 
       // 2.4 Borrar Draft (evita duplicados)
       try {
-        const delUrl = `https://${shop}/admin/api/2024-10/draft_orders/${draft_id}.json`;
+        const delUrl = `https://${shopHost}/admin/api/2024-10/draft_orders/${draft_id}.json`;
         const delRes = await fetch(delUrl, {
           method: "DELETE",
           headers: { "X-Shopify-Access-Token": token }
@@ -201,7 +207,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // ---------- (3) Conciliación MODO: leer /data y setear metafields ----------
+    // ---------- (3) Conciliación MODO → metafields ----------
     let savedMeta = null;
     try {
       if (orderId && paymentRequestId) {
@@ -211,7 +217,7 @@ export default async function handler(req, res) {
 
         const fields = {
           payment_request_id: paymentRequestId || "",
-          modo_status: modoData?.status || "APPROVED",
+          modo_status: modoData?.status || status,
           payment_method: modoData?.payment_method || modoData?.method || "",
           scheme: modoData?.scheme || "",
           installments_quantity: installments?.quantity ?? null,
@@ -231,7 +237,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       trace,
-      completed: true,
+      processed: true,
       draft_id,
       order_id: orderId,
       payment_request_id: paymentRequestId || null,
