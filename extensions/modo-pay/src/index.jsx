@@ -95,7 +95,7 @@ function ModoPay() {
   })();
 
   // --- App Proxy: forzar dominio .myshopify.com (limpio y robusto) ---
-  const href = `https://${SHOP_DOMAIN}/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
+const href = `https://${SHOP_DOMAIN}/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
 
   return (
     <BlockStack spacing="tight">
