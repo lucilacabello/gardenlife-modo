@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       const amount = new URL(location.href).searchParams.get("amount") || "0";
 
       // 1) Pedir QR al proxy
-      const r1 = await fetch("/api/proxy/qr?amount=" + encodeURIComponent(amount), { credentials: "omit" });
+	const r1 = await fetch("qr?amount=" + encodeURIComponent(amount), { credentials: "omit" });
       if (!r1.ok) throw new Error("QR HTTP " + r1.status);
       const q = await r1.json();
       if (!q.ok) throw new Error("QR payload not ok");
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       const timer = setInterval(async () => {
         try {
           tries++;
-          const r2 = await fetch("/api/proxy/status/" + encodeURIComponent(q.paymentId) + "?mock=1", { credentials: "omit" });
+const r2 = await fetch("status/" + encodeURIComponent(q.paymentId) + "?mock=1", { credentials: "omit" });
           if (!r2.ok) throw new Error("Status HTTP " + r2.status);
           const s = await r2.json();
           const st = (s && s.status) || "UNKNOWN";
