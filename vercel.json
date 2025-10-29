@@ -4,7 +4,7 @@
     { "src": "/start",      "dest": "/apps/modopay/start.html" },
     { "src": "/start.html", "dest": "/apps/modopay/start.html" },
 
-    { "src": "/apps/modopay/health", "dest": "/api/health" },
-    { "src": "/health",              "dest": "/api/health" }
+    { "src": "/health",              "dest": "/api/health" },
+    { "src": "/apps/modopay/health", "dest": "/api/health" }
   ]
 }
