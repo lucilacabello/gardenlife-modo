@@ -22,9 +22,12 @@
   <pre id="debug"></pre>
 
 <script>
-  // Redirigir si se abre directamente desde Vercel (siempre al proxy público de Shopify)
+  // Solo redirige si viene con ?redir=1 (para evitar loop a 404)
   if (location.hostname.endsWith('vercel.app')) {
-    location.href = `https://gardenlife.com.ar/apps/modopay/start.html${location.search}`;
+    const sp = new URLSearchParams(location.search);
+    if (sp.get('redir') === '1') {
+      location.href = `https://gardenlife.com.ar/apps/modopay/start.html${location.search}`;
+    }
   }
 </script>
 
