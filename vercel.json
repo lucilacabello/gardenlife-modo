@@ -3,8 +3,6 @@
   "routes": [
     { "src": "/start.html",               "dest": "/api/start.html" },
     { "src": "/health",                   "dest": "/api/health" },
-    { "src": "/modo/payment-request",     "dest": "/api/modo/payment-request" },
-    { "src": "/modo/modo-webhook",        "dest": "/api/modo-webhook" },
 
     { "src": "/api/proxy/health",         "dest": "/api/health" },
     { "src": "/api/proxy/start.html",     "dest": "/api/start.html" },
@@ -13,6 +11,11 @@
 
     { "src": "/qr",                       "dest": "/api/qr" },
     { "src": "/status/(.*)",              "dest": "/api/status.js?id=$1" },
+
+    { "src": "/apps/modopay/start.html",  "dest": "/api/start.html" },
+    { "src": "/apps/modopay/qr",          "dest": "/api/qr" },
+    { "src": "/apps/modopay/status/(.*)", "dest": "/api/status.js?id=$1" },
+
     { "src": "/apps/modopay/(.*)",        "dest": "/api/$1" },
 
     { "src": "/api/proxy/(.*)",           "dest": "/api/proxy.js" },
