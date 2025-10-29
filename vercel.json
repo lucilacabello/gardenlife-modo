@@ -14,6 +14,7 @@
     { "src": "/qr",                       "dest": "/api/qr" },
     { "src": "/status/(.*)",              "dest": "/api/status.js?id=$1" },
 
+    /* ⬇️ ESTA LÍNEA NUEVA ES LA CLAVE */
     { "src": "/apps/modopay/(.*)",        "dest": "/api/$1" },
 
     { "src": "/api/proxy/(.*)",           "dest": "/api/proxy.js" },
