@@ -1,30 +1,45 @@
+// api/proxy/[[...slug]].js
+const fs = require("fs");
+const path = require("path");
 
-export default async function handler(req, res) {
-  const { slug = [] } = req.query;
+module.exports = async function handler(req, res) {
+  try {
+    const slugParts = Array.isArray(req.query.slug) ? req.query.slug : [];
+    const subpath = slugParts.join("/").toLowerCase();
 
-  // --- Health check ---
-  if (slug[0] === "health") {
-    return res.status(200).json({ ok: true, msg: "Health OK (proxy)", time: Date.now() });
+    // 🟢 Sirve start.html directamente
+    if (subpath === "start" || subpath === "start.html") {
+      const filePath = path.join(process.cwd(), "public", "start.html");
+      const html = fs.readFileSync(filePath, "utf8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    }
+
+    // Redirigir /apps/modo/... a /apps/modopay/...
+    if (req.url.includes("/apps/modo/")) {
+      const redirectUrl = req.url.replace("/apps/modo/", "/apps/modopay/");
+      return res.redirect(302, redirectUrl);
+    }
+
+    // Servir otros archivos estáticos desde /public
+    const staticPath = path.join(process.cwd(), "public", subpath);
+    if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
+      const ext = path.extname(staticPath);
+      const contentType =
+        ext === ".js" ? "application/javascript" :
+        ext === ".css" ? "text/css" :
+        ext === ".json" ? "application/json" :
+        ext === ".png" ? "image/png" :
+        ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
+        "text/plain; charset=utf-8";
+      res.setHeader("Content-Type", contentType);
+      return res.status(200).send(fs.readFileSync(staticPath));
+    }
+
+    return res.status(404).json({ error: "NOT_FOUND", subpath });
+  } catch (e) {
+    console.error("[proxy][error]", e);
+    return res.status(500).json({ error: "SERVER_ERROR", message: e.message });
   }
-
-  // --- Start page ---
-  if (slug[0] === "start.html") {
-    const amount = req.query.amount || "0";
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    return res.status(200).send(`
-<!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>MODO Start</title></head>
-  <body style="font-family:sans-serif;text-align:center;padding-top:40px">
-    <h1>💳 MODO — iniciando pago</h1>
-    <p>Monto: ${amount}</p>
-    <p>Todo OK: el proxy está respondiendo ✅</p>
-  </body>
-</html>
-`);
-  }
-
-  // --- Fallback ---
-  return res.status(404).json({ error: "NOT_FOUND", slug });
-}
+};
 
