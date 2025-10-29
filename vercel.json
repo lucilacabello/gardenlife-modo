@@ -6,6 +6,10 @@
     { "src": "/shopify/draft-create", "dest": "/api/shopify/draft-create" },
     { "src": "/modo/payment-request", "dest": "/api/modo/payment-request" },
     { "src": "/modo/modo-webhook",    "dest": "/api/modo-webhook" },
+
+    { "src": "/api/proxy/health",     "dest": "/api/health" },
+    { "src": "/api/proxy/start.html", "dest": "/api/start.html" },
+
     { "src": "/api/proxy/(.*)",       "dest": "/api/proxy.js" },
     { "src": "/api/(.*)",             "dest": "/api/$1" }
   ]
