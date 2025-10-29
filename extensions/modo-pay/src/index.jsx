@@ -27,7 +27,7 @@ function ModoPay() {
   const now = new Date();
   const promo = now >= new Date('2025-11-30T00:00:00-03:00') && now <= new Date('2025-12-02T23:59:59-03:00');
   const REINTEGRO = 20;
-  const btnLabel = promo ? `Pagar con MODO — ${REINTEGRO}% de reintegro` : 'Pagar con MODO';
+  const btnLabel = promo ? `Pagar con MODO v27 — ${REINTEGRO}% de reintegro` : 'Pagar con MODOv27';
   
   // --- Monto seguro ---
   const rawTotal = Number(checkout?.totalAmount?.amount ?? 0);
@@ -96,7 +96,8 @@ function ModoPay() {
   })();
 
   // --- App Proxy: forzar dominio .myshopify.com (limpio y robusto) ---
-const href = `https://${SHOP_DOMAIN}/apps/modopay/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
+
+const href = `/apps/modopay/start.html?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
 
   return (
     <BlockStack spacing="tight">
