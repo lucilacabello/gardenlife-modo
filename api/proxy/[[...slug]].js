@@ -4,10 +4,12 @@ const path = require("path");
 
 module.exports = async function handler(req, res) {
   try {
-    const slugParts = Array.isArray(req.query.slug) ? req.query.slug : [];
-    const subpath = slugParts.join("/").toLowerCase();
+    // Obtener el subpath de forma robusta aunque slug venga vacío
+    const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+    let subpath = url.pathname.replace(/^\/api\/proxy\/?/, ""); // ej: "start.html"
+    subpath = (subpath || "").toLowerCase();
 
-    // 🟢 Sirve start.html directamente
+    // 🟢 /start o /start.html → devolver public/start.html
     if (subpath === "start" || subpath === "start.html") {
       const filePath = path.join(process.cwd(), "public", "start.html");
       const html = fs.readFileSync(filePath, "utf8");
@@ -15,25 +17,27 @@ module.exports = async function handler(req, res) {
       return res.status(200).send(html);
     }
 
-    // Redirigir /apps/modo/... a /apps/modopay/...
+    // Alias por si alguna vez cae /apps/modo → /apps/modopay
     if (req.url.includes("/apps/modo/")) {
       const redirectUrl = req.url.replace("/apps/modo/", "/apps/modopay/");
       return res.redirect(302, redirectUrl);
     }
 
-    // Servir otros archivos estáticos desde /public
-    const staticPath = path.join(process.cwd(), "public", subpath);
-    if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
-      const ext = path.extname(staticPath);
-      const contentType =
-        ext === ".js" ? "application/javascript" :
-        ext === ".css" ? "text/css" :
-        ext === ".json" ? "application/json" :
-        ext === ".png" ? "image/png" :
-        ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
-        "text/plain; charset=utf-8";
-      res.setHeader("Content-Type", contentType);
-      return res.status(200).send(fs.readFileSync(staticPath));
+    // Servir cualquier otro archivo que exista en /public (css/js/img)
+    if (subpath) {
+      const staticPath = path.join(process.cwd(), "public", subpath);
+      if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
+        const ext = path.extname(staticPath);
+        const ct =
+          ext === ".js"   ? "application/javascript" :
+          ext === ".css"  ? "text/css" :
+          ext === ".json" ? "application/json" :
+          ext === ".png"  ? "image/png" :
+          ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
+          "text/plain; charset=utf-8";
+        res.setHeader("Content-Type", ct);
+        return res.status(200).send(fs.readFileSync(staticPath));
+      }
     }
 
     return res.status(404).json({ error: "NOT_FOUND", subpath });
