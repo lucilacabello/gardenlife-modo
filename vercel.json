@@ -5,10 +5,8 @@
     { "src": "/start.html",               "dest": "/apps/modopay/start.html" },
 
     { "src": "/apps/modopay/start",       "dest": "/apps/modopay/start.html" },
-
     { "src": "/apps/modopay/health",      "dest": "/api/health" },
     { "src": "/health",                   "dest": "/api/health" },
-
     { "src": "/apps/modopay/status",      "dest": "/api/status.js" },
     { "src": "/status",                   "dest": "/api/status.js" },
 
