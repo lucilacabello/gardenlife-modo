@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       const timer = setInterval(async () => {
         try {
           tries++;
-const r2 = await fetch("status/" + encodeURIComponent(q.paymentId) + "?mock=1", { credentials: "omit" });
+const r2 = await fetch("status?id=" + encodeURIComponent(q.paymentId) + "&mock=1", { credentials: "omit" });
           if (!r2.ok) throw new Error("Status HTTP " + r2.status);
           const s = await r2.json();
           const st = (s && s.status) || "UNKNOWN";
