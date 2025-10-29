@@ -9,6 +9,8 @@
 
     { "src": "/api/proxy/health",     "dest": "/api/health" },
     { "src": "/api/proxy/start.html", "dest": "/api/start.html" },
+    { "src": "/api/proxy/qr",         "dest": "/api/qr" },
+    { "src": "/api/proxy/status/(.*)","dest": "/api/status.js?id=$1" },
 
     { "src": "/api/proxy/(.*)",       "dest": "/api/proxy.js" },
     { "src": "/api/(.*)",             "dest": "/api/$1" }
