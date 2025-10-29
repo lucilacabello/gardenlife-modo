@@ -1,20 +1,10 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/start",                    "dest": "/apps/modopay/start.html" },
-    { "src": "/start.html",               "dest": "/apps/modopay/start.html" },
+    { "src": "/start",      "dest": "/apps/modopay/start.html" },
+    { "src": "/start.html", "dest": "/apps/modopay/start.html" },
 
-    { "src": "/apps/modopay/start",       "dest": "/apps/modopay/start.html" },
-    { "src": "/apps/modopay/health",      "dest": "/api/health" },
-    { "src": "/health",                   "dest": "/api/health" },
-    { "src": "/apps/modopay/status",      "dest": "/api/status.js" },
-    { "src": "/status",                   "dest": "/api/status.js" },
-
-    { "src": "/api/proxy/health",         "dest": "/api/health" },
-    { "src": "/api/proxy/start.html",     "dest": "/apps/modopay/start.html" },
-    { "src": "/api/proxy/status/(.*)",    "dest": "/api/status.js?id=$1" },
-
-    { "src": "/api/proxy/(.*)",           "dest": "/api/proxy.js" },
-    { "src": "/api/(.*)",                 "dest": "/api/$1" }
+    { "src": "/apps/modopay/health", "dest": "/api/health" },
+    { "src": "/health",              "dest": "/api/health" }
   ]
 }
