@@ -1,10 +1,12 @@
-name: MODO y Apps Bancarias
+name: MODO Pay Block
 type: checkout_ui_extension
-api_version: 2025-07
-targets:
-  - target: purchase.checkout.block.render
-    module: ./src/index.jsx
-# (sin default_placement)
+api_version: 2024-10
+
+extension_points:
+  - purchase.checkout.block.render
+
+entry: src/index.jsx
+
 capabilities:
   network_access: true
-
+  api_access: true
