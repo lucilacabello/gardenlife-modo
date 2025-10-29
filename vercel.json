@@ -1,18 +1,17 @@
+cat > vercel.json <<'JSON'
 {
   "version": 2,
   "routes": [
-    { "src": "/start.html",               "dest": "/api/start.html" },
     { "src": "/health",                   "dest": "/api/health" },
-
     { "src": "/qr",                       "dest": "/api/qr" },
     { "src": "/status",                   "dest": "/api/status.js" },
 
-    { "src": "/apps/modopay/start.html",  "dest": "/api/start.html" },
-    { "src": "/apps/modopay/qr",          "dest": "/api/qr" },
+    { "src": "/apps/modopay/start",       "dest": "/apps/modopay/start.html" },
+    { "src": "/apps/modopay/health",      "dest": "/api/health" },
     { "src": "/apps/modopay/status",      "dest": "/api/status.js" },
 
     { "src": "/api/proxy/health",         "dest": "/api/health" },
-    { "src": "/api/proxy/start.html",     "dest": "/api/start.html" },
+    { "src": "/api/proxy/start.html",     "dest": "/apps/modopay/start.html" },
     { "src": "/api/proxy/qr",             "dest": "/api/qr" },
     { "src": "/api/proxy/status/(.*)",    "dest": "/api/status.js?id=$1" },
 
@@ -20,4 +19,5 @@
     { "src": "/api/(.*)",                 "dest": "/api/$1" }
   ]
 }
+JSON
 
