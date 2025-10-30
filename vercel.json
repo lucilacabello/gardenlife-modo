@@ -1,11 +1,10 @@
 {
   "version": 2,
   "routes": [
-    { "src": "^/start(\\.html)?$",               "dest": "/apps/modopay/start.html" },
-    { "src": "^/apps/modopay/start(\\.html)?$",  "dest": "/apps/modopay/start.html" },
-    { "src": "^/apps/modo/start(\\.html)?$",     "dest": "/apps/modopay/start.html" },
+    { "src": "^/start(\\.html)?$",              "dest": "/apps/modopay/start.html" },
+    { "src": "^/apps/modo/start(\\.html)?$",    "dest": "/apps/modopay/start.html" },
 
-    { "src": "^/health$",                        "dest": "/api/health" },
-    { "src": "^/apps/(modopay|modo)/health$",    "dest": "/api/health" }
+    { "src": "^/health$",                       "dest": "/api/health" },
+    { "src": "^/apps/(modopay|modo)/health$",   "dest": "/api/health" }
   ]
 }
