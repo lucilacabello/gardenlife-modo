@@ -16,6 +16,13 @@
   </style>
 </head>
 <body>
+  <!-- Parche: si alguien abre por Vercel, redirigimos al App Proxy de Shopify -->
+  <script>
+    if (location.hostname.endsWith('vercel.app')) {
+      location.href = 'https://gardenlife.com.ar/apps/modopay/start.html' + location.search;
+    }
+  </script>
+
   <h1>Pagá con MODO 💳</h1>
   <p id="phase" class="muted">Preparando pago…</p>
   <p id="status" class="muted"></p>
@@ -93,7 +100,6 @@
           callbackURLSuccess: `${origin}/pages/gracias`
         } : undefined,
 
-        // (Desktop) URL a la que vuelve si cierra o si no avanza
         callbackURL: `${origin}/pages/gracias`,
 
         // Requerido por MODO para "Generar nuevo QR"
@@ -115,7 +121,7 @@
       if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
         ModoSDK.modoInitPayment(modalObject);
       } else {
-        // Fallback simple: mostrar QR estático si el SDK no cargó
+        // Fallback: mostrar QR estático si el SDK no cargó
         const img = new Image();
         img.alt = 'QR de pago MODO';
         img.style.maxWidth = '260px';
