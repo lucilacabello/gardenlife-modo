@@ -1,13 +1,20 @@
 {
   "version": 2,
   "routes": [
-    { "src": "^/apps/modo/start(\\.html)?$", "dest": "/apps/modopay/start.html" },
+    { "src": "^/apps/modo/start(\\.html)?$",           "dest": "/apps/modopay/start.html" },
 
-    { "src": "^/start(\\.html)?$",                    "dest": "/apps/modopay/start.html" },
-    { "src": "^/apps/modopay/start(\\.html)?$",       "dest": "/apps/modopay/start.html" },
-    { "src": "^/apps/(modopay|modo)/health$",         "dest": "/api/health" },
-    { "src": "^/shopify/(.*)$",                       "dest": "/api/shopify/$1" },
-    { "src": "^/modo/(.*)$",                          "dest": "/api/modo/$1" },
-    { "src": "^/health$",                             "dest": "/api/health" }
+    { "src": "^/start(\\.html)?$",                     "dest": "/apps/modopay/start.html" },
+    { "src": "^/apps/modopay/start(\\.html)?$",        "dest": "/apps/modopay/start.html" },
+
+    { "src": "^/apps/(modopay|modo)/health$",          "dest": "/api/health" },
+
+    /* 👉 NUEVO: endpoints JSON usados por el checkout (modal) */
+    { "src": "^/apps/modopay/start\\.json$",           "dest": "/api/modo/payment-request" },
+    { "src": "^/apps/modopay/status/(.*)$",            "dest": "/api/modo/status?id=$1" },
+    { "src": "^/apps/modopay/finalize\\.json$",        "dest": "/api/shopify/draft-create" },
+
+    { "src": "^/shopify/(.*)$",                        "dest": "/api/shopify/$1" },
+    { "src": "^/modo/(.*)$",                           "dest": "/api/modo/$1" },
+    { "src": "^/health$",                              "dest": "/api/health" }
   ]
 }
