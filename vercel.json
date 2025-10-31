@@ -8,7 +8,6 @@
 
     { "src": "^/apps/(modopay|modo)/health$",          "dest": "/api/health" },
 
-    /* 👉 NUEVO: endpoints JSON usados por el checkout (modal) */
     { "src": "^/apps/modopay/start\\.json$",           "dest": "/api/modo/payment-request" },
     { "src": "^/apps/modopay/status/(.*)$",            "dest": "/api/modo/status?id=$1" },
     { "src": "^/apps/modopay/finalize\\.json$",        "dest": "/api/shopify/draft-create" },
