@@ -119,17 +119,18 @@ module.exports = async function handler(req, res) {
 
     if (debug) console.error("[DEBUG][payment-request][REQUEST]", { trace, amount, body });
 
-    const r = await fetch(`${base}/v2/payment-requests/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": process.env.MODO_USER_AGENT, // usar NOMBRE REAL del comercio
-        "Authorization": `Bearer ${token}`,
-        "X-Trace-Id": trace
-      },
-      body: JSON.stringify(body)
-    });
+const r = await fetch(`${base.replace(/\/+$/,"")}/v2/payment-requests`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "User-Agent": process.env.MODO_USER_AGENT, // usar NOMBRE REAL del comercio
+    "Authorization": `Bearer ${token}`,
+    "X-Trace-Id": trace,
+    "X-Idempotency-Key": shortId("IPK") // 🆕 evita duplicados si se reintenta la creación
+  },
+  body: JSON.stringify(body)
+});
 
     const text = await r.text();
     let data; try { data = JSON.parse(text); } catch(_) { data = { raw: text }; }

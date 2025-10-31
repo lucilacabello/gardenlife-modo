@@ -1,7 +1,4 @@
-// api/modo/status.js (CommonJS)
-// Consulta el estado real del payment-request por ID.
-// Requiere: APP_URL (para token), MODO_BASE_URL, MODO_USER_AGENT
-
+// api/modo/status.js — MODO Directa (api.modo.com.ar)
 let CACHED_TOKEN = null;
 let CACHED_TOKEN_EXP = 0;
 
@@ -13,17 +10,16 @@ function getBaseAppUrl() {
 
 async function getToken() {
   if (CACHED_TOKEN && Date.now() < CACHED_TOKEN_EXP) return CACHED_TOKEN;
-  const base = getBaseAppUrl();
-  const r = await fetch(`${base}/api/modo/token`, { method: "POST" });
+  const r = await fetch(`${getBaseAppUrl()}/api/modo/token`, { method: "POST" });
   if (!r.ok) throw new Error(`TOKEN_FAIL ${r.status}`);
   const j = await r.json();
   CACHED_TOKEN = j.access_token;
-  CACHED_TOKEN_EXP = Date.now() + 6 * 60 * 60 * 1000; // 6h
+  CACHED_TOKEN_EXP = Date.now() + 6 * 60 * 60 * 1000;
   return CACHED_TOKEN;
 }
 
 function assertEnv() {
-  const req = ["APP_URL", "MODO_BASE_URL", "MODO_USER_AGENT"];
+  const req = ["APP_URL","MODO_BASE_URL","MODO_USER_AGENT"];
   const miss = req.filter(k => !process.env[k]);
   if (miss.length) throw new Error(`ENV_MISSING ${miss.join(",")}`);
 }
@@ -33,15 +29,13 @@ module.exports = async function handler(req, res) {
   const debug = req.query?.debug === "1";
   try {
     assertEnv();
-    if (req.method !== "GET") {
-      return res.status(405).json({ error: "METHOD_NOT_ALLOWED" });
-    }
+    if (req.method !== "GET") return res.status(405).json({ error: "METHOD_NOT_ALLOWED" });
 
     const id = (req.query?.id || "").toString().trim();
     if (!id) return res.status(400).json({ error: "MISSING_ID" });
 
     const token = await getToken();
-    const base = process.env.MODO_BASE_URL.replace(/\/+$/, "");
+    const base = process.env.MODO_BASE_URL.replace(/\/+$/,"");
     const url = `${base}/v2/payment-requests/${encodeURIComponent(id)}/data`;
 
     const r = await fetch(url, {
@@ -72,7 +66,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       trace,
       id,
-      status: statusRaw, // INIT | PENDING | APPROVED | REJECTED | EXPIRED | CANCELLED
+      status: statusRaw, // INIT|PENDING|APPROVED|REJECTED|EXPIRED|CANCELLED
       amount,
       approvedAt,
       payer,
