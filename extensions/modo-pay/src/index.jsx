@@ -1,3 +1,4 @@
+
 import {
   reactExtension,
   BlockStack,
@@ -126,7 +127,4 @@ const href = `/apps/modopay/start.html?amount=${Math.max(0, amount || 0).toFixed
     </BlockStack>
   );
 }
-
-
-
 
