@@ -16,7 +16,7 @@ import {
 } from '@shopify/ui-extensions-react/checkout';
 import {useCallback, useEffect, useMemo, useState} from 'react';
 
-export default reactExtension('purchase.checkout.block.render', () => <ModoPay />);
+export default reactExtension('purchase.checkout.block.render', () => <ModoPayLULILULI />);
 
 function ModoPay() {
   const { checkout } = useExtensionApi();
