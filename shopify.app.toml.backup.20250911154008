@@ -1,0 +1,33 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "44d5b4da30178eb0a61c04c874a79f64"
+name = "gardenlife-modo"
+application_url = "https://pathology-bracket-incidents-mutual.trycloudflare.com/"
+embedded = true
+handle = "gardenlife-modo"
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products"
+
+[auth]
+redirect_urls = [
+  "https://pathology-bracket-incidents-mutual.trycloudflare.com/auth/callback",
+  "https://pathology-bracket-incidents-mutual.trycloudflare.com/auth/shopify/callback",
+  "https://pathology-bracket-incidents-mutual.trycloudflare.com/api/auth/callback"
+]
+
+[app_proxy]
+url = "https://gardenlife-modo.vercel.app/apps/modo"
+subpath = "modo"
+prefix = "apps"
+
+[pos]
+embedded = false

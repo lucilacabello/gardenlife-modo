@@ -1,0 +1,13 @@
+name = "MODO y Apps Bancarias"
+uid = "1a8ae478-a3ec-35f7-0bbf-16ec6006530864f3423d"
+type = "checkout_ui_extension"
+api_version = "2025-07"
+handle = "modo-pay-block"
+description = "Pago con MODO: abre QR/deeplink en el checkout."
+
+[ui_extension]
+extension_points = ["purchase.checkout.block.render"]
+module = "./src/index.jsx"
+default_placement = "WALLETS1"
+
+

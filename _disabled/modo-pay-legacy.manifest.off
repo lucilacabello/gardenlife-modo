@@ -1,0 +1,9 @@
+api_version = "2023-10"
+type = "checkout_ui_extension"
+name = "MODO Test"
+handle = "modo-test"
+
+[[targeting]]
+target = "purchase.checkout.block.render"
+module = "./src/index.jsx"
+

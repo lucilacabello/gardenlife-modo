@@ -1,0 +1,45 @@
+import React from "react";
+import {
+  reactExtension,
+  BlockStack,
+  Button,
+  Text,
+  useApi,
+  useTotalAmount,
+} from "@shopify/ui-extensions-react/checkout";
+
+// ÚNICO target: paso de pago
+export default reactExtension(
+  "purchase.checkout.payment-methods.render",
+  () => <ModoPay />
+);
+
+function ModoPay() {
+  const api = useApi();
+  const total = useTotalAmount();
+  const baseUrl = (api?.shop?.storefrontUrl || "").replace(/\/$/, "");
+  const [state, setState] = React.useState({ loading: false, data: null, error: null });
+
+  async function startPayment() {
+    setState({ loading: true, data: null, error: null });
+    try {
+      const amount = Number(total?.amount ?? 0) / 100;
+      const res = await fetch(`${baseUrl}/apps/modo/qr?mock=1&amount=${amount.toFixed(2)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json();
+      setState({ loading: false, data: payload, error: null });
+    } catch (e) {
+      setState({ loading: false, data: null, error: "No pudimos iniciar MODO. Intentá nuevamente." });
+    }
+  }
+
+  return (
+    <BlockStack spacing="tight">
+      <Text>💳 Pagar con MODO</Text>
+      <Button onPress={startPayment} loading={state.loading}>
+        Pagar con MODO
+      </Button>
+      {state.error && <Text>❌ {state.error}</Text>}
+    </BlockStack>
+  );
+}

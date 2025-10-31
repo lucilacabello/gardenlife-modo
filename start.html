@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Pago con MODO - Gardenlife</title>
+
+  <!-- SDK MODO (PROD). Para preprod usar: https://ecommerce-modal.preprod.modo.com.ar/bundle.js -->
+  <script src="https://ecommerce-modal.modo.com.ar/bundle.js"></script>
+
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; text-align:center; margin:32px; }
+    .muted { color:#666; font-size:14px; }
+    #debug { display:none; white-space:pre-wrap; font-size:12px; text-align:left; background:#f7f7f7; border:1px solid #e3e3e3; border-radius:8px; padding:12px; margin:16px auto; max-width:720px; }
+    .btn { display:none; margin:8px; padding:10px 16px; border:0; border-radius:8px; background:#2E7D32; color:#fff; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h1>Pagá con MODO 💳</h1>
+  <p id="phase" class="muted">Preparando pago…</p>
+  <p id="status" class="muted"></p>
+  <p>Monto: $<span id="amountText">--</span></p>
+  <button id="openModo" class="btn">Abrir MODO</button>
+  <button id="doneBtn" class="btn">Finalizar</button>
+  <pre id="debug"></pre>
+
+  <script>
+    // ===== Utilidades =====
+    const q = new URLSearchParams(location.search);
+    const amount = Number(q.get('amount') || '10');
+    const draftIdFromUrl = q.get('draft_id') || null;
+    const PROXY_BASE = '/apps/modopay';
+
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (msg) => { $('status').textContent = msg || ''; };
+    const setPhase  = (msg) => { $('phase').textContent  = msg || ''; };
+    const showBtns  = () => { $('openModo').style.display = $('doneBtn').style.display = 'inline-block'; };
+    const logDebug  = (obj) => {
+      try { obj = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); } catch {}
+      const el = $('debug'); el.style.display = 'block'; el.textContent = String(obj).slice(0, 8000);
+    };
+
+    async function fetchJSON(url, init) {
+      const res = await fetch(url, init);
+      const txt = await res.text();
+      try { return { ok: res.ok, status: res.status, json: JSON.parse(txt), raw: txt }; }
+      catch { return { ok: res.ok, status: res.status, json: null, raw: txt }; }
+    }
+
+    // ===== 1) (Opcional) Garantizar Draft Order en Shopify =====
+    async function ensureDraft(draftId) {
+      if (draftId) return draftId;
+      setStatus('Creando borrador de pedido…');
+      const payload = {
+        note: 'Pago con MODO',
+        tags: ['modo','qr'],
+        lineItems: [{ title: 'Pago MODO', price: amount, quantity: 1 }]
+      };
+      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/shopify/draft-create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      if (!ok || !json?.draft_id) { logDebug(raw || json); throw new Error('No se pudo crear el borrador'); }
+      return json.draft_id;
+    }
+
+    // ===== 2) Crear intención de pago (payment-request) =====
+    async function createPaymentIntention(draftId) {
+      setStatus('Creando intención de pago…');
+      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/modo/payment-request`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, draft_id: draftId })
+      });
+      if (!ok) { logDebug(raw || json); throw new Error('Error al crear el pago'); }
+      return {
+        checkoutId: json.id,
+        qrString:   json.qr,
+        deeplink:   typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null)
+      };
+    }
+
+    // ===== 3) Mostrar modal MODO (SDK v2) =====
+    async function showModo(draftId) {
+      const data = await createPaymentIntention(draftId);
+      const origin = location.origin;
+
+      const modalObject = {
+        version: '2',
+        checkoutId: data.checkoutId,
+        qrString:   data.qrString,
+        deeplink:   data.deeplink ? {
+          url: data.deeplink,
+          callbackURL:        `${origin}/cart`,
+          callbackURLSuccess: `${origin}/pages/gracias`
+        } : undefined,
+
+        // (Desktop) URL a la que vuelve si cierra o si no avanza
+        callbackURL: `${origin}/pages/gracias`,
+
+        // Requerido por MODO para "Generar nuevo QR"
+        refreshData: async () => {
+          const d = await createPaymentIntention(draftId);
+          return {
+            checkoutId: d.checkoutId,
+            qrString:   d.qrString,
+            deeplink:   d.deeplink ? { url: d.deeplink } : undefined
+          };
+        },
+
+        onSuccess: () => console.log('[MODO] success'),
+        onFailure: () => console.log('[MODO] failure'),
+        onCancel:  () => console.log('[MODO] cancel'),
+        onClose:   () => console.log('[MODO] close')
+      };
+
+      if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
+        ModoSDK.modoInitPayment(modalObject);
+      } else {
+        // Fallback simple: mostrar QR estático si el SDK no cargó
+        const img = new Image();
+        img.alt = 'QR de pago MODO';
+        img.style.maxWidth = '260px';
+        img.src = `https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=${encodeURIComponent(data.qrString)}`;
+        ($('debug') || document.body).appendChild(img);
+        logDebug('SDK MODO no disponible. Mostrando QR estático.');
+      }
+      showBtns();
+    }
+
+    // ===== Secuencia principal =====
+    (async () => {
+      try {
+        $('amountText').textContent = amount.toFixed(2);
+        const draftId = await ensureDraft(draftIdFromUrl);
+        setPhase('Listo. Escaneá el QR o abrí la app MODO.');
+        $('openModo').onclick = () => showModo(draftId);
+        $('doneBtn').onclick = () => location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
+        await showModo(draftId); // auto-abrir modal
+      } catch (e) {
+        console.error(e);
+        setPhase('Error al preparar el pago.');
+        setStatus(e?.message || 'Error inesperado');
+        logDebug(e);
+        showBtns();
+      }
+    })();
+  </script>
+</body>
+</html>
+
+

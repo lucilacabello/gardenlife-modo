@@ -1,0 +1,8 @@
+# Un solo servicio web: el backend (no tenemos frontend)
+[[web]]
+name = "backend"
+type = "backend"
+path = "."
+port = 3000
+commands = { dev = "cross-env NODE_ENV=development nodemon index.js --ignore ./frontend" }
+

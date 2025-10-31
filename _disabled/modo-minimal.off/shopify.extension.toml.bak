@@ -1,0 +1,11 @@
+api_version = "2024-07"
+type = "checkout_ui_extension"
+name = "MODO Minimal"
+handle = "modo-minimal"
+
+[capabilities]
+network_access = true
+
+[targets]
+purchase.thank-you.render-after = "src/index.jsx"
+

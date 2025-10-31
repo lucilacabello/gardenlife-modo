@@ -1,0 +1,17 @@
+type = "ui_extension"
+name = "Modo Pay QR"
+handle = "modo-pay-qr"
+runtime_context = "checkout"
+api_version = "2024-07"
+
+[[targeting]]
+target = "purchase.thank-you.block.render"
+module = "./src/index.jsx"
+
+[[targeting]]
+target = "customer-account.order-status.block.render"
+module = "./src/index.jsx"
+
+[capabilities]
+api_access = true
+
