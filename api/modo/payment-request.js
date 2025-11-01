@@ -119,7 +119,7 @@ module.exports = async function handler(req, res) {
 
     if (debug) console.error("[DEBUG][payment-request][REQUEST]", { trace, amount, body });
 
-const r = await fetch(`${base.replace(/\/+$/,"")}/v2/payment-requests`, {
+const r = await fetch(`${base.replace(/\/+$/,"")}/v2/payment-requests/`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
