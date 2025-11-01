@@ -1,13 +1,12 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/apps/modo/start",           "destination": "/apps/modo/start.html" },
-    { "source": "/apps/modo/payment-request", "destination": "/api/modo/payment-request" },
-    { "source": "/apps/modo/status",          "destination": "/api/modo/status" },
-    { "source": "/apps/modo/status/:id*",     "destination": "/api/modo/status?id=:id" },
-    { "source": "/apps/modo/shopify/:path*",  "destination": "/api/shopify/:path*" },
-    { "source": "/apps/(modopay|modo)/health","destination": "/api/health" },
-    { "source": "/start",                     "destination": "/apps/modo/start.html" },
-    { "source": "/health",                    "destination": "/api/health" }
+    { "source": "/apps/modo/start",            "destination": "/apps/modo/start.html" },
+
+    { "source": "/apps/modo/payment-request",  "destination": "/api/modo/payment-request" },
+    { "source": "/apps/modo/status",           "destination": "/api/modo/status" },
+    { "source": "/apps/modo/status/:id*",      "destination": "/api/modo/status?id=:id" },
+
+    { "source": "/apps/modo/health",           "destination": "/api/health" }
   ]
 }
