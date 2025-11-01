@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
 
     // Alias por si alguna vez cae /apps/modo → /apps/modopay
     if (req.url.includes("/apps/modo/")) {
-      const redirectUrl = req.url.replace("/apps/modo/", "/apps/modopay/");
+      const redirectUrl = req.url.replace("/apps/modopay/", "/apps/modo/");
       return res.redirect(302, redirectUrl);
     }
 

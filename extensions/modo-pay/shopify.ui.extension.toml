@@ -1,0 +1,15 @@
+name = "Pagar con MODO"
+handle = "modo-pay-block-gl"
+uid = "68df2874-06f0-4fb4-20ec-035b5898022a0df2727e"
+type = "checkout_ui_extension"
+api_version = "2024-07"
+runtime = "react"
+
+targets = ["purchase.checkout.block.render"]
+
+[build]
+command = "npm run build"
+path = "dist"
+
+[capabilities]
+network_access = true
