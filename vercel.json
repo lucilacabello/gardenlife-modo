@@ -1,26 +1,41 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/apps/modo/start",                  "destination": "/apps/modopay/start.html" },
-    { "source": "/apps/modo/start.html",             "destination": "/apps/modopay/start.html" },
-
-    { "source": "/apps/modo/payment-request",        "destination": "/api/modo/payment-request" },
-    { "source": "/apps/modo/status",                 "destination": "/api/modo/status" },
-    { "source": "/apps/modo/status/:id*",            "destination": "/api/modo/status?id=:id" },
-
-    { "source": "/apps/modopay/payment-request",     "destination": "/api/modo/payment-request" },
-    { "source": "/apps/modopay/status",              "destination": "/api/modo/status" },
-    { "source": "/apps/modopay/status/:id*",         "destination": "/api/modo/status?id=:id" },
-
-    { "source": "/start",                            "destination": "/apps/modopay/start.html" },
-    { "source": "/apps/modopay/start",               "destination": "/apps/modopay/start.html" },
-    { "source": "/apps/modopay/start.html",          "destination": "/apps/modopay/start.html" },
-
-    { "source": "/apps/:any(.*)/health",             "destination": "/api/health" },
-
-    { "source": "/shopify/:path*",                   "destination": "/api/shopify/:path*" },
-    { "source": "/modo/:path*",                      "destination": "/api/modo/:path*" },
-    { "source": "/health",                           "destination": "/api/health" }
+  "routes": [
+    {
+      "source": "/apps/modopay/start",
+      "destination": "/apps/modopay/start.html"
+    },
+    {
+      "source": "/apps/modo/start",
+      "destination": "/apps/modo/start.html"
+    },
+    {
+      "source": "/apps/modo/start.html",
+      "destination": "/apps/modo/start.html"
+    },
+    {
+      "source": "/apps/modo/payment-request",
+      "destination": "/api/modo/payment-request"
+    },
+    {
+      "source": "/apps/modo/status",
+      "destination": "/api/modo/status"
+    },
+    {
+      "source": "/apps/modo/status/:id*",
+      "destination": "/api/modo/status?id=:id"
+    },
+    {
+      "source": "/apps/modo/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/start",
+      "destination": "/apps/modo/start.html"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/health"
+    }
   ]
 }
-
