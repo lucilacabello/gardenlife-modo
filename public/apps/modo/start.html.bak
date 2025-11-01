@@ -1,0 +1,6 @@
+<!doctype html><meta charset="utf-8">
+<title>Redirigiendo…</title>
+<script>
+  // preserva ?amount=...&ctx=...
+  location.replace('/apps/modo/start' + location.search);
+</script>
