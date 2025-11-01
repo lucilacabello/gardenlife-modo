@@ -19,7 +19,7 @@
   <!-- Parche: si alguien abre por Vercel, redirigimos al App Proxy de Shopify -->
   <script>
     if (location.hostname.endsWith('vercel.app')) {
-      location.href = 'https://gardenlife.com.ar/apps/modopay/start.html' + location.search;
+      location.href = '/apps/modo/start' + location.search;
     }
   </script>
 
@@ -36,7 +36,7 @@
     const q = new URLSearchParams(location.search);
     const amount = Number(q.get('amount') || '10');
     const draftIdFromUrl = q.get('draft_id') || null;
-    const PROXY_BASE = '/apps/modopay';
+    const PROXY_BASE = '/apps/modo';
 
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg) => { $('status').textContent = msg || ''; };

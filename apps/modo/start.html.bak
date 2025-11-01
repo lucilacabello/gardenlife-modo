@@ -29,7 +29,7 @@
     const q = new URLSearchParams(location.search);
     const amount = Number(q.get('amount') || '10');
     const draftIdFromUrl = q.get('draft_id') || null;
-    const PROXY_BASE = '/apps/modo';
+    const PROXY_BASE = '/apps/modopay';
 
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg) => { $('status').textContent = msg || ''; };

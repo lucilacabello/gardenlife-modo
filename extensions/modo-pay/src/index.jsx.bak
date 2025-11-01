@@ -22,7 +22,7 @@ function ModoPay() {
   // --- Config básica ---
   // Forzamos .myshopify.com para que el proxy siempre resuelva, aunque el checkout esté en dominio custom
   const SHOP_DOMAIN = checkout?.shop?.myshopifyDomain || 'gardenlife.myshopify.com';
-const PROXY_BASE = `https://${SHOP_DOMAIN}/apps/modopay`;
+const PROXY_BASE = "/apps/modopay";
     
   // (Opcional) ventana de promo Cyber Monday
   const now = new Date();
