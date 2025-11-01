@@ -57,26 +57,28 @@ module.exports = async function handler(req, res) {
       return res.status(r.status).json({ error: "STATUS_FAIL", status: r.status, trace, detail: data });
     }
 
-    const statusRaw = (data?.status || data?.state || "").toString().toUpperCase();
-    const amount = data?.amount ?? null;
-    const approvedAt = data?.approvedAt || data?.paidAt || null;
-    const payer = data?.payer || null;
-    const metadata = data?.metadata || null;
-
-    return res.status(200).json({
-      trace,
-      id,
-      status: statusRaw, // INIT|PENDING|APPROVED|REJECTED|EXPIRED|CANCELLED
-      amount,
-      approvedAt,
-      payer,
-      metadata,
-      raw: debug ? data : undefined
-    });
-
-  } catch (e) {
-    console.error("[MODO][status][ERROR]", { trace, msg: e.message });
-    return res.status(500).json({ error: "SERVER_ERROR", trace, message: e.message || "Unexpected" });
-  }
+// --- Normalización según nuevo esquema MODO SDK v2 ---
+const statusRaw = (data?.status || "").toString().toUpperCase();
+const amount = data?.amount ?? null;
+const payer = data?.payer || null;
+const metadata = {
+  external_intention_id: data?.external_intention_id || null,
+  gateway_transaction_id: data?.gateway_transaction_id || null,
+  card_authorization_code: data?.card_authorization_code || null,
+  message: data?.message || null
 };
+const installments = data?.installments || null;
+const card = data?.card || null;
+
+return res.status(200).json({
+  trace,
+  id,
+  status: statusRaw, // SCANNED | PROCESSING | ACCEPTED | REJECTED
+  amount,
+  payer,
+  metadata,
+  card,
+  installments,
+  raw: debug ? data : undefined
+});
 
