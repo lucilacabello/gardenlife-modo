@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/apps/modo/shopify/:path*",
+      "destination": "/api/shopify/:path*"
+    },
+    {
       "source": "/apps/modopay/start",
       "destination": "/apps/modopay/start.html"
     },
@@ -48,10 +52,7 @@
     {
       "source": "/health",
       "destination": "/api/health"
-    },
-    {
-      "source": "/apps/modo/shopify/:path*",
-      "destination": "/api/shopify/:path*"
     }
   ]
 }
+
