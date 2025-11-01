@@ -1,41 +1,21 @@
 {
   "version": 2,
   "routes": [
-    {
-      "source": "/apps/modopay/start",
-      "destination": "/apps/modopay/start.html"
-    },
-    {
-      "source": "/apps/modo/start",
-      "destination": "/apps/modo/start.html"
-    },
-    {
-      "source": "/apps/modo/start.html",
-      "destination": "/apps/modo/start.html"
-    },
-    {
-      "source": "/apps/modo/payment-request",
-      "destination": "/api/modo/payment-request"
-    },
-    {
-      "source": "/apps/modo/status",
-      "destination": "/api/modo/status"
-    },
-    {
-      "source": "/apps/modo/status/:id*",
-      "destination": "/api/modo/status?id=:id"
-    },
-    {
-      "source": "/apps/modo/health",
-      "destination": "/api/health"
-    },
-    {
-      "source": "/start",
-      "destination": "/apps/modo/start.html"
-    },
-    {
-      "source": "/health",
-      "destination": "/api/health"
-    }
+    { "src": "^/apps/modo/start(\\.html)?$",        "dest": "/apps/modopay/start.html" },
+
+    { "src": "^/apps/modopay/start(\\.html)?$",     "dest": "/apps/modopay/start.html" },
+    { "src": "^/start(\\.html)?$",                  "dest": "/apps/modopay/start.html" },
+
+    { "src": "^/apps/modo/payment-request$",        "dest": "/api/modo/payment-request" },
+    { "src": "^/apps/modo/status$",                 "dest": "/api/modo/status" },
+    { "src": "^/apps/modo/status/(.*)$",            "dest": "/api/modo/status?id=$1" },
+
+    { "src": "^/apps/modopay/payment-request$",     "dest": "/api/modo/payment-request" },
+    { "src": "^/apps/modopay/status$",              "dest": "/api/modo/status" },
+    { "src": "^/apps/modopay/status/(.*)$",         "dest": "/api/modo/status?id=$1" },
+
+    { "src": "^/apps/(modopay|modo)/health$",       "dest": "/api/health" },
+    { "src": "^/health$",                           "dest": "/api/health" }
   ]
 }
+
