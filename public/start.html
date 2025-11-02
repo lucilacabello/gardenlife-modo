@@ -58,12 +58,11 @@
     async function ensureDraft(draftId) {
       if (draftId) return draftId;
       setStatus('Creando borrador de pedido…');
-
       const payload = {
         note: 'Pago con MODO',
         tags: ['modo','qr'],
-        lineItems: Array.isArray(ctx.items) && ctx.items.length
-          ? ctx.items
+        lineItems: Array.isArray(ctx.lineItems) && ctx.lineItems.length
+          ? ctx.lineItems
           : [{ title: 'Pago MODO', price: amount, quantity: 1 }],
         customer: ctx.customer || {},
         shipping_address: ctx.shipping_address || {},
@@ -111,7 +110,6 @@
     async function showModo(draftId) {
       const data = await createPaymentIntention(draftId);
       const origin = location.origin;
-
       const modalObject = {
         version: '2',
         checkoutId: data.checkoutId,
