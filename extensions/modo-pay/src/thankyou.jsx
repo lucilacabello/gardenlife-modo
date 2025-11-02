@@ -33,7 +33,7 @@ function ModoThankYou() {
   const url =
     base +
     (orderId ? `&orderId=${encodeURIComponent(orderId)}` : "") +
-    (amount ? `&amount=${encodeURIComponent(amount)}` : "");
+    (amount "");
 
   return (
     <BlockStack spacing="loose">
