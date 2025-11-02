@@ -1,24 +1,20 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/apps/modo/start.html",      "destination": "/start.html" },
-    { "source": "/apps/modo/start",           "destination": "/start.html" },
-    { "source": "/start.html",                "destination": "/start.html" },
-    { "source": "/start",                     "destination": "/start.html" },
+  "routes": [
+    { "src": "^/apps/modo/start(\\.html)?$",     "dest": "/start.html" },
 
-    { "source": "/apps/modo/health",          "destination": "/api/health" },
-    { "source": "/health",                    "destination": "/api/health" },
+    { "src": "^/apps/modo/health$",              "dest": "/api/health" },
+    { "src": "^/apps/modo/payment-request$",     "dest": "/api/modo/payment-request" },
+    { "src": "^/apps/modo/status$",              "dest": "/api/modo/status" },
+    { "src": "^/apps/modo/status/(.*)$",         "dest": "/api/modo/status?id=$1" },
+    { "src": "^/apps/modo/shopify/(.*)$",        "dest": "/api/shopify/$1" },
 
-    { "source": "/apps/modo/payment-request", "destination": "/api/modo/payment-request" },
-    { "source": "/payment-request",           "destination": "/api/modo/payment-request" },
-
-    { "source": "/apps/modo/status",          "destination": "/api/modo/status" },
-    { "source": "/status",                    "destination": "/api/modo/status" },
-    { "source": "/apps/modo/status/:id*",     "destination": "/api/modo/status?id=:id" },
-    { "source": "/status/:id*",               "destination": "/api/modo/status?id=:id" },
-
-    { "source": "/apps/modo/shopify/:path*",  "destination": "/api/shopify/:path*" },
-    { "source": "/shopify/:path*",            "destination": "/api/shopify/:path*" }
+    { "src": "^/start(\\.html)?$",               "dest": "/start.html" },
+    { "src": "^/health$",                        "dest": "/api/health" },
+    { "src": "^/payment-request$",               "dest": "/api/modo/payment-request" },
+    { "src": "^/status$",                        "dest": "/api/modo/status" },
+    { "src": "^/status/(.*)$",                   "dest": "/api/modo/status?id=$1" },
+    { "src": "^/shopify/(.*)$",                  "dest": "/api/shopify/$1" }
   ]
 }
 
