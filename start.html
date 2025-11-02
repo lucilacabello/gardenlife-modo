@@ -16,6 +16,14 @@
   </style>
 </head>
 <body>
+
+  <!-- Redirección automática si se abre en Vercel -->
+  <script>
+    if (location.hostname.endsWith('vercel.app')) {
+      location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
+    }
+  </script>
+
   <h1>Pagá con MODO 💳</h1>
   <p id="phase" class="muted">Preparando pago…</p>
   <p id="status" class="muted"></p>
@@ -92,11 +100,7 @@
           callbackURL:        `${origin}/cart`,
           callbackURLSuccess: `${origin}/pages/gracias`
         } : undefined,
-
-        // (Desktop) URL a la que vuelve si cierra o si no avanza
         callbackURL: `${origin}/pages/gracias`,
-
-        // Requerido por MODO para "Generar nuevo QR"
         refreshData: async () => {
           const d = await createPaymentIntention(draftId);
           return {
@@ -105,7 +109,6 @@
             deeplink:   d.deeplink ? { url: d.deeplink } : undefined
           };
         },
-
         onSuccess: () => console.log('[MODO] success'),
         onFailure: () => console.log('[MODO] failure'),
         onCancel:  () => console.log('[MODO] cancel'),
@@ -115,7 +118,6 @@
       if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
         ModoSDK.modoInitPayment(modalObject);
       } else {
-        // Fallback simple: mostrar QR estático si el SDK no cargó
         const img = new Image();
         img.alt = 'QR de pago MODO';
         img.style.maxWidth = '260px';
@@ -134,7 +136,7 @@
         setPhase('Listo. Escaneá el QR o abrí la app MODO.');
         $('openModo').onclick = () => showModo(draftId);
         $('doneBtn').onclick = () => location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
-        await showModo(draftId); // auto-abrir modal
+        await showModo(draftId);
       } catch (e) {
         console.error(e);
         setPhase('Error al preparar el pago.');
@@ -146,5 +148,4 @@
   </script>
 </body>
 </html>
-
 
