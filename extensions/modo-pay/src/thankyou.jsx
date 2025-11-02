@@ -4,41 +4,46 @@ import {
   Banner,
   Button,
   Text,
-  useOrder,
+  useExtensionApi,
 } from "@shopify/ui-extensions-react/checkout";
 
 export default reactExtension("purchase.thank-you.block.render", () => <ModoThankYou />);
 
 function ModoThankYou() {
-  let amount = "0.00";
+  const api = useExtensionApi();
+
+  // Intentamos leer orderId y total desde el API del surface (sin hooks no soportados)
+  const orderId =
+    (api?.checkout && api.checkout.order && api.checkout.order.id) ||
+    ""; // puede venir como GID
+
+  const rawAmount =
+    (api?.checkout && api.checkout.totalAmount && api.checkout.totalAmount.amount) ||
+    "";
+
+  let amount = "";
   try {
-    const order = useOrder();
-    const raw = String(order?.totalAmount?.amount ?? "0").replace(",", ".");
-    const n = Number(raw);
-    amount = Number.isFinite(n) ? n.toFixed(2) : "0.00";
-  } catch (e) {
-    console.warn("useOrder fallback:", e);
+    const n = Number(String(rawAmount).replace(",", "."));
+    amount = Number.isFinite(n) && n > 0 ? n.toFixed(2) : "";
+  } catch {
+    amount = "";
   }
 
-  const modoURL = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${amount}`;
-
-  const openModo = () => {
-    try {
-      window.open(modoURL, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      console.error("Error al abrir MODO:", e);
-    }
-  };
+  const base = "https://gardenlife.com.ar/apps/modo/start.html?mode=ty";
+  const url =
+    base +
+    (orderId ? `&orderId=${encodeURIComponent(orderId)}` : "") +
+    (amount ? `&amount=${encodeURIComponent(amount)}` : "");
 
   return (
     <BlockStack spacing="loose">
-      <Banner title="¿Pagaste con MODO (QR)?">
+      <Banner title="Pago con MODO (QR)">
         <Text>
-          Si elegiste <strong>MODO</strong> como medio manual, abrí el QR para completar el pago.<br/>
-          Monto detectado: <strong>${amount}</strong>.
+          Si elegiste MODO como medio de pago manual, podés abrir el QR para
+          finalizar el pago. Si ya pagaste, ignorá este mensaje.
         </Text>
       </Banner>
-      <Button kind="primary" onPress={openModo}>
+      <Button kind="primary" to={url}>
         Abrir QR de MODO
       </Button>
     </BlockStack>
