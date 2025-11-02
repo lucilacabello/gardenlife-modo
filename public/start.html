@@ -32,6 +32,7 @@
     const amount = Number(q.get('amount') || '10');
     const draftIdFromUrl = q.get('draft_id') || null;
     const PROXY_BASE = '/apps/modo';
+
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg) => { $('status').textContent = msg || ''; };
     const setPhase  = (msg) => { $('phase').textContent  = msg || ''; };
@@ -77,26 +78,26 @@
       };
     }
 
-    async function waitOrderUrl(paymentId, timeoutMs = 60000) {
-      const t0 = Date.now();
-      while (Date.now() - t0 < timeoutMs) {
-        const r = await fetch(`${PROXY_BASE}/status/${encodeURIComponent(paymentId)}`);
-        const txt = await r.text();
-        let j = null; try { j = JSON.parse(txt); } catch {}
-        if (r.ok && j) {
-          const url   = j.order_status_url;
-          const state = String(j.status || j.state || '').toUpperCase();
-          if (url) return url;
-          if (state === 'REJECTED' || state === 'CANCELLED') throw new Error('Pago rechazado/cancelado');
+    // ✅ NUEVO: completa la draft y redirige a la Thank You nativa
+    async function completeDraftAndRedirect(draftId) {
+      try {
+        const r = await fetch(`${PROXY_BASE}/shopify/draft-complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draft_id: draftId })
+        });
+        const j = await r.json();
+        if (r.ok && j?.order_status_url) {
+          location.href = j.order_status_url;
+          return true;
         }
-        await new Promise(res => setTimeout(res, 1500));
-      }
-      return null;
+      } catch(e) {}
+      location.href = `/pages/gracias?draft_id=${encodeURIComponent(draftId)}`;
+      return false;
     }
 
     async function showModo(draftId) {
       const data = await createPaymentIntention(draftId);
-      const paymentId = data.checkoutId;
       const origin = location.origin;
 
       const modalObject = {
@@ -114,13 +115,7 @@
           return { checkoutId: d.checkoutId, qrString: d.qrString, deeplink: d.deeplink ? { url: d.deeplink } : undefined };
         },
         onSuccess: async () => {
-          try {
-            const thank = await waitOrderUrl(paymentId);
-            if (thank) location.href = thank;
-            else location.href = `${origin}/pages/gracias`;
-          } catch {
-            location.href = `${origin}/pages/gracias`;
-          }
+          await completeDraftAndRedirect(draftId);
         },
         onFailure: () => location.href = `${origin}/checkout`,
         onCancel:  () => location.href = `${origin}/checkout`,
@@ -159,4 +154,3 @@
   </script>
 </body>
 </html>
-
