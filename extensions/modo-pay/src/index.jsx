@@ -9,6 +9,7 @@ import {
   useEmail,
   useShippingAddress,
   useDeliveryGroups,
+  useBuyerJourneyIntercept,
 } from '@shopify/ui-extensions-react/checkout';
   
 export default reactExtension('purchase.checkout.block.render', () => <ModoPay />);
@@ -20,15 +21,13 @@ function ModoPay() {
   const { deliveryGroups } = useDeliveryGroups();
     
   // --- Config básica ---
-  // Forzamos .myshopify.com para que el proxy siempre resuelva, aunque el checkout esté en dominio custom
   const SHOP_DOMAIN = checkout?.shop?.myshopifyDomain || 'gardenlife.myshopify.com';
-const PROXY_BASE = '/apps/modo';
+  const PROXY_BASE = "/apps/modo";
     
-  // (Opcional) ventana de promo Cyber Monday
   const now = new Date();
   const promo = now >= new Date('2025-11-30T00:00:00-03:00') && now <= new Date('2025-12-02T23:59:59-03:00');
   const REINTEGRO = 20;
-  const btnLabel = promo ? `Pagar con MODO v27 — ${REINTEGRO}% de reintegro` : 'Pagar con MODO v27';
+  const btnLabel = promo ? `Pagar con MODO — ${REINTEGRO}% de reintegro` : 'Pagar con MODO';
   
   // --- Monto seguro ---
   const rawTotal = Number(checkout?.totalAmount?.amount ?? 0);
@@ -63,39 +62,29 @@ const PROXY_BASE = '/apps/modo';
   if (!hasShippingSelection) missing.push('Elegí un método de envío o retiro.');
   if (!isPickup && !hasAddress) missing.push('Completá la dirección de envío.');
   if (!isPayable) missing.push('El total debe ser mayor a $0.');
-  
-  // --- Contexto para backend (UTF-8 safe Base64) ---
+
+  // --- Interceptar si faltan datos ---
+  useBuyerJourneyIntercept(({ canBlockProgress }) => {
+    if (!isReady || !isPayable) {
+      return {
+        behavior: canBlockProgress ? 'block' : 'allow',
+        reason: 'Completá email, dirección y método de envío antes de pagar con MODO',
+        errors: missing.map(m => ({ message: m })),
+      };
+    }
+    return { behavior: 'allow' };
+  });
+      
+  // --- App Proxy: abrir dentro del mismo checkout ---
   const ctx = (() => {
     const payload = {
       customer: { email: email?.address || '' },
-      shipping_address: isPickup
-        ? {
-            first_name: sa.firstName || '',
-            last_name:  sa.lastName  || '',
-            address1:   'RETIRO EN TIENDA',
-            city:       sa.city || '',
-            zip:        sa.postalCode || '',
-            province:   sa.provinceCode || sa.province || '',
-            country:    sa.countryCode || 'AR',
-            phone:      sa.phone || '',
-          }
-        : {
-            first_name: sa.firstName || '',
-            last_name:  sa.lastName  || '',
-            address1:   sa.address1  || '',
-            address2:   sa.address2  || '',
-            city:       sa.city || '',
-            zip:        sa.postalCode || '',
-            province:   sa.provinceCode || sa.province || '',
-            country:    sa.countryCode || '',
-            phone:      sa.phone || '',
-          },
+      shipping_address: sa,
       is_pickup: isPickup,
     };
     return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   })();
-      
-  // --- App Proxy: abrir dentro del mismo checkout ---
+
   const href = `${PROXY_BASE}/start?amount=${Math.max(0, amount || 0).toFixed(2)}&ctx=${encodeURIComponent(ctx)}`;
             
   return (
@@ -104,7 +93,7 @@ const PROXY_BASE = '/apps/modo';
             
       {promo && (
         <Banner status="info" title="Promo Cyber Monday">
-          Pagá con MODO y recibí {REINTEGRO}% de reintegro. Válido por tiempo limitado.
+          Pagá con MODO y recibí {REINTEGRO}% de reintegro.
         </Banner>
       )}
             
@@ -118,9 +107,7 @@ const PROXY_BASE = '/apps/modo';
           <Button kind="primary" disabled>{btnLabel}</Button>
         </>
       ) : (
-        <Link to={href}>
-          <Button kind="primary">{btnLabel}</Button>
-        </Link>
+        <Button kind="primary" onPress={() => window.location.href = href}>{btnLabel}</Button>
       )}
     </BlockStack>
   );
