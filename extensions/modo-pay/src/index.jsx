@@ -10,7 +10,6 @@ import {
   useDeliveryGroups,
   useCartLines,
   useBuyerJourneyIntercept,
-  useNavigate,
 } from '@shopify/ui-extensions-react/checkout';
 
 export default reactExtension('purchase.checkout.block.render', () => <ModoPay />);
@@ -21,7 +20,6 @@ function ModoPay() {
   const { shippingAddress } = useShippingAddress();
   const { deliveryGroups } = useDeliveryGroups();
   const cartLines = useCartLines();
-  const navigate = useNavigate();
 
   const PROXY_BASE = "/apps/modo";
 
