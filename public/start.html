@@ -74,7 +74,7 @@
     // ===== 2) Crear intención de pago (payment-request) =====
     async function createPaymentIntention(draftId) {
       setStatus('Creando intención de pago…');
-      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/modo/payment-request`, {
+      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/payment-request`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount, draft_id: draftId })
       });
