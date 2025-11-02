@@ -31,7 +31,8 @@
     const q = new URLSearchParams(location.search);
     const amount = Number(q.get('amount') || '10');
     const draftIdFromUrl = q.get('draft_id') || null;
-    const PROXY_BASE = '/apps/modo';
+    const PROXY_BASE = "/apps/modo";
+const mode = (q.get("mode") || "").toLowerCase();
     const mode = (q.get('mode') || '').toLowerCase();
 
     let ctx = {};
@@ -72,7 +73,7 @@
       };
 
       const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/shopify/draft-create`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        body: JSON.stringify(mode === "ty" ? { amount } : { amount, draft_id: draftId })
       });
       if (!ok || !json?.draft_id) { logDebug(raw || json); throw new Error('No se pudo crear el borrador'); }
       return json.draft_id;
@@ -97,7 +98,7 @@
         const r = await fetch(`${PROXY_BASE}/shopify/draft-complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draft_id: draftId })
+        body: JSON.stringify(mode === "ty" ? { amount } : { amount, draft_id: draftId })
         });
         const j = await r.json();
         if (r.ok && j?.order_status_url) {
