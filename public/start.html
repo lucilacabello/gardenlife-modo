@@ -10,16 +10,22 @@
     .muted { color:#666; font-size:14px; }
     #debug { display:none; white-space:pre-wrap; font-size:12px; text-align:left; background:#f7f7f7; border:1px solid #e3e3e3; border-radius:8px; padding:12px; margin:16px auto; max-width:720px; }
     .btn { display:none; margin:8px; padding:10px 16px; border:0; border-radius:8px; background:#2E7D32; color:#fff; cursor:pointer; }
+    .spinner { margin: 16px auto; border: 4px solid #ddd; border-top-color: #2E7D32; border-radius: 50%; width: 36px; height: 36px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #errorBanner{display:none;color:#fff;background:#d32f2f;padding:8px;border-radius:6px;margin:10px auto;max-width:720px;}
   </style>
 </head>
 <body>
   <script>
+    // si abre en vercel, redirigir al proxy de Shopify
     if (location.hostname.endsWith('vercel.app')) {
       location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
     }
   </script>
 
   <h1>Pagá con MODO 💳</h1>
+  <div id="errorBanner"></div>
+  <div id="spinner" class="spinner" aria-label="Cargando"></div>
   <p id="phase" class="muted">Preparando pago…</p>
   <p id="status" class="muted"></p>
   <p>Monto: $<span id="amountText">--</span></p>
@@ -29,17 +35,15 @@
 
   <script>
     const q = new URLSearchParams(location.search);
-    const amount = Number(q.get('amount') || '10');
-    const draftIdFromUrl = q.get('draft_id') || null;
+    const mode = (q.get('mode') || '').toLowerCase();
+    const orderId = q.get('orderId') || '';      // puede venir GID o numérico
+    let amount = Number(q.get('amount') || '0'); // si ya viene, lo usamos
+
     const PROXY_BASE = '/apps/modo';
-
-    let ctx = {};
-    try {
-      const raw = q.get('ctx') || '';
-      ctx = raw ? JSON.parse(decodeURIComponent(escape(atob(raw)))) : {};
-    } catch {}
-
     const $ = (id) => document.getElementById(id);
+
+    function showSpinner(show){ $('spinner').style.display = show ? 'block' : 'none'; }
+    function showError(msg){ const el=$('errorBanner'); el.textContent=msg; el.style.display='block'; }
     const setStatus = (msg) => { $('status').textContent = msg || ''; };
     const setPhase  = (msg) => { $('phase').textContent  = msg || ''; };
     const showBtns  = () => { $('openModo').style.display = $('doneBtn').style.display = 'inline-block'; };
@@ -55,33 +59,31 @@
       catch { return { ok: res.ok, status: res.status, json: null, raw: txt }; }
     }
 
-    async function ensureDraft(draftId) {
-      if (draftId) return draftId;
-      setStatus('Creando borrador de pedido…');
-
-      const payload = {
-        note: 'Pago con MODO',
-        tags: ['modo','qr'],
-        lineItems: Array.isArray(ctx.items) && ctx.items.length
-          ? ctx.items
-          : [{ title: 'Pago MODO', price: amount, quantity: 1 }],
-        customer: ctx.customer || {},
-        shipping_address: ctx.shipping_address || {},
-        shipping_line: ctx.is_pickup ? { title: 'Retiro en tienda', price: 0 } : undefined
-      };
-
-      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/shopify/draft-create`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      if (!ok || !json?.draft_id) { logDebug(raw || json); throw new Error('No se pudo crear el borrador'); }
-      return json.draft_id;
+    async function resolveAmountIfNeeded() {
+      if (amount > 0) return amount;
+      if (orderId) {
+        setStatus('Consultando monto de la orden…');
+        const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/get-order-amount?orderId=${encodeURIComponent(orderId)}`);
+        if (!ok || !json?.amount) {
+          logDebug(raw || json);
+          throw new Error('No se pudo obtener el monto de la orden');
+        }
+        amount = Number(json.amount || 0);
+        return amount;
+      }
+      throw new Error('Falta el monto. Volvé atrás e intentá nuevamente.');
     }
+
+    // En "ty" no creamos draft
+    async function ensureDraft(draftId){ return null; }
 
     async function createPaymentIntention(draftId) {
       setStatus('Creando intención de pago…');
+      const body = (mode === 'ty')
+        ? { amount }
+        : { amount, draft_id: draftId };
       const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/payment-request`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, draft_id: draftId })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       if (!ok) { logDebug(raw || json); throw new Error('Error al crear el pago'); }
       return {
@@ -111,7 +113,6 @@
     async function showModo(draftId) {
       const data = await createPaymentIntention(draftId);
       const origin = location.origin;
-
       const modalObject = {
         version: '2',
         checkoutId: data.checkoutId,
@@ -119,17 +120,17 @@
         deeplink: data.deeplink ? {
           url: data.deeplink,
           callbackURL: `${origin}/cart`,
-          callbackURLSuccess: `${origin}/checkout`
+          callbackURLSuccess: (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`)
         } : undefined,
-        callbackURL: `${origin}/checkout`,
+        callbackURL: (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`),
         refreshData: async () => {
           const d = await createPaymentIntention(draftId);
           return { checkoutId: d.checkoutId, qrString: d.qrString, deeplink: d.deeplink ? { url: d.deeplink } : undefined };
         },
-        onSuccess: async () => { await completeDraftAndRedirect(draftId); },
-        onFailure: () => location.href = `${origin}/checkout`,
-        onCancel:  () => location.href = `${origin}/checkout`,
-        onClose:   () => location.href = `${origin}/checkout`,
+        onSuccess: async () => { if (mode==='ty') { setStatus('Pago confirmado ✅'); } else { await completeDraftAndRedirect(draftId); } },
+        onFailure: () => location.href = (mode==='ty' ? `${origin}/account/orders` : `${origin}/checkout`),
+        onCancel:  () => location.href = (mode==='ty' ? `${origin}/account/orders` : `${origin}/checkout`),
+        onClose:   () => location.href = (mode==='ty' ? `${origin}/account/orders` : `${origin}/checkout`),
       };
 
       if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
@@ -140,23 +141,46 @@
         img.style.maxWidth = '260px';
         img.src = `https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=${encodeURIComponent(data.qrString)}`;
         ($('debug') || document.body).appendChild(img);
+        setStatus('Escaneá el QR o abrí la app MODO.');
         logDebug('SDK MODO no disponible. Mostrando QR estático.');
       }
       showBtns();
     }
 
+    // MONITOREO opcional (si querés activar, descomenta pollPaymentStatus)
+    async function pollPaymentStatus(id) {
+      const timer = setInterval(async () => {
+        try {
+          const r = await fetch(`${PROXY_BASE}/status/${id}`);
+          if (!r.ok) return;
+          const j = await r.json();
+          if (['PAID','COMPLETED','APPROVED'].includes(String(j.status || '').toUpperCase())) {
+            clearInterval(timer);
+            setStatus('✅ Pago acreditado');
+          }
+        } catch {}
+      }, 15000);
+    }
+
     (async () => {
+      showSpinner(true);
       try {
+        if (amount <= 0) {
+          await resolveAmountIfNeeded();
+        }
         $('amountText').textContent = amount.toFixed(2);
-        const draftId = await ensureDraft(draftIdFromUrl);
-        setPhase('Listo. Escaneá el QR o abrí la app MODO.');
-        $('openModo').onclick = () => showModo(draftId);
-        $('doneBtn').onclick = () => completeDraftAndRedirect(draftId);
-        await showModo(draftId);
+        setPhase(mode==='ty' ? 'Listo. Abrí la app o escaneá el QR para pagar.' : 'Creando borrador y preparando pago…');
+        $('openModo').onclick = () => showModo(null);
+        $('doneBtn').style.display = (mode==='ty') ? 'none' : 'inline-block';
+        $('doneBtn').onclick = () => completeDraftAndRedirect(null);
+        await showModo(null);
+        showSpinner(false);
       } catch (e) {
         console.error(e);
+        showSpinner(false);
         setPhase('Error al preparar el pago.');
         setStatus(e?.message || 'Error inesperado');
+        showError('Ocurrió un error al generar el QR. Intentá nuevamente.');
         logDebug(e);
         showBtns();
       }

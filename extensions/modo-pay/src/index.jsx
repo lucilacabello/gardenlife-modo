@@ -71,46 +71,26 @@ function ModoPay() {
     }
   });
 
-  const items = (cartLines ?? []).map(l => {
-    const gid = l?.merchandise?.id || '';
-    const variant_id = Number(gid.split('/').pop());
-    return { variant_id, quantity: l?.quantity ?? 1 };
-  }).filter(it => Number.isFinite(it.variant_id) && it.variant_id > 0);
-
-  const shipping_address = isPickup
-    ? {
-        first_name: sa.firstName || '',
-        last_name:  sa.lastName  || '',
-        address1:   'RETIRO EN TIENDA',
-        city:       sa.city || '',
-        zip:        sa.postalCode || '',
-        province:   sa.provinceCode || sa.province || '',
-        country:    sa.countryCode || 'AR',
-        phone:      sa.phone || '',
-      }
-    : {
-        first_name: sa.firstName || '',
-        last_name:  sa.lastName  || '',
-        address1:   sa.address1  || '',
-        address2:   sa.address2  || '',
-        city:       sa.city || '',
-        zip:        sa.postalCode || '',
-        province:   sa.provinceCode || sa.province || '',
-        country:    sa.countryCode || '',
-        phone:      sa.phone || '',
-      };
-
   async function handlePay() {
-    const ctx = (() => {
-      const payload = {
-        customer: { email: email?.address || '' },
-        shipping_address,
-        is_pickup: isPickup,
-        items,
-      };
-      return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    })();
+    // 1) Mapear ítems reales
+    const lineItems = (cartLines || []).map(l => ({
+      variant_id: (l.merchandise?.id || '').split('/').pop(),
+      quantity: l.quantity,
+      price: Number(l.cost?.totalAmount?.amount || 0),
+      title: l.merchandise?.product?.title || 'Producto'
+    }));
 
+    // 2) Contexto completo (para fallback)
+    const ctxObj = {
+      customer: { email: email?.address || '' },
+      shipping_address: shippingAddress || {},
+      billing_address: shippingAddress || {},
+      is_pickup: isPickup,
+      lineItems
+    };
+    const ctx = btoa(unescape(encodeURIComponent(JSON.stringify(ctxObj))));
+
+    // 3) Crear draft antes de salir
     let draftId = null;
     try {
       const resp = await fetch(`${PROXY_BASE}/shopify/draft-create`, {
@@ -119,23 +99,26 @@ function ModoPay() {
         body: JSON.stringify({
           note: 'Pago con MODO',
           tags: ['modo','qr'],
-          lineItems: items.length ? items : [{ title: 'Pago MODO', price: amount, quantity: 1 }],
-          customer: { email: email?.address || '' },
-          shipping_address,
-          shipping_line: isPickup ? { title: 'Retiro en tienda', price: 0 } : undefined,
+          lineItems,
+          customer: ctxObj.customer,
+          shipping_address: ctxObj.shipping_address,
+          billing_address: ctxObj.billing_address,
+          shipping_line: isPickup ? { title: 'Retiro en tienda', price: 0 } : undefined
         })
       });
       const j = await resp.json();
       if (resp.ok && j?.draft_id) draftId = j.draft_id;
-    } catch {}
+    } catch (e) {
+      console.warn('[MODO] draft-create fallback', e);
+    }
 
+    // 4) Redirigir misma pestaña
     const href =
       `${PROXY_BASE}/start.html?amount=${encodeURIComponent(Math.max(0, amount || 0).toFixed(2))}` +
       `${draftId ? `&draft_id=${encodeURIComponent(draftId)}` : ''}` +
       `&ctx=${encodeURIComponent(ctx)}`;
 
-    const nav = typeof navigate === 'function' ? navigate : (url) => { (window.top || window).location.href = url; };
-    nav(href);
+    (window.top || window).location.href = href;
   }
 
   return (

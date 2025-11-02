@@ -85,6 +85,7 @@ export default async function handler(req, res) {
     // ---- Draft body Shopify REST ----
     const draftBody = {
       draft_order: {
+    email: (customer && customer.email) ? customer.email : undefined,
         note: note || "Checkout con MODO",
         tags: tagsString,
         customer: customer?.email ? { email: String(customer.email) } : undefined,
