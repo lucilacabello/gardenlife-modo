@@ -1,0 +1,113 @@
+// /api/modo/webhook.js
+// Webhook oficial de MODO (producción).
+// Procesa el evento de pago ACCEPTED y completa la Draft Order correspondiente.
+//
+// Estados esperados: CREATED, SCANNED, PROCESSING, ACCEPTED, REJECTED
+// En ACCEPTED → completa la Draft y la orden queda marcada como pagada automáticamente.
+//
+// Variables requeridas:
+//   SHOPIFY_SHOP = cfafc3-c5.myshopify.com
+//   SHOPIFY_ADMIN_TOKEN = <Admin API token>
+//   APP_URL = https://gardenlife-modo.vercel.app
+
+import * as jose from 'jose';
+
+const JWKS_URL = 'https://merchants.playdigital.com.ar/v2/payment-requests/.well-known/jwks.json';
+const APP_URL  = process.env.APP_URL || 'https://gardenlife-modo.vercel.app';
+const SHOP     = process.env.SHOPIFY_SHOP;
+const TOKEN    = process.env.SHOPIFY_ADMIN_TOKEN;
+
+export default async function handler(req, res) {
+  const trace = `WB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+  try {
+    // 1️⃣ Verificamos método
+    if (req.method !== 'POST' && !req.query.mock)
+      return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
+
+    // 2️⃣ Si mock=... simula sin verificar firma
+    const mock = req.query?.mock;
+    if (mock) {
+      const draft_id = req.query?.draft_id || 'MOCK_DRAFT';
+      const amount   = req.query?.amount   || 0;
+      console.log(`[MODO][MOCK] Simulando estado: ${mock} | draft_id=${draft_id}`);
+      if (mock === 'accepted') {
+        const dc = await draftComplete(draft_id);
+        return res.status(200).json({ ok: true, trace, mock: true, dc });
+      }
+      return res.status(200).json({ ok: true, trace, mock: true, note: `Mock status=${mock}` });
+    }
+
+    // 3️⃣ Parse body (puede venir string)
+    let body = req.body ?? {};
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
+
+    const signature = req.headers['modo-signature'] || body?.signature;
+    if (!signature) return res.status(400).json({ error: 'MISSING_SIGNATURE' });
+
+    const payload = await verifySignature(signature);
+    const event   = payload?.event ?? '';
+    const data    = payload?.data ?? {};
+
+    console.log(`[MODO][WEBHOOK][${event}]`, JSON.stringify(data));
+
+    // 4️⃣ Sólo actuamos si estado = ACCEPTED
+    const status = String(data.status || '').toUpperCase();
+    if (status !== 'ACCEPTED') {
+      return res.status(200).json({ ok: true, trace, note: `Ignored status=${status}` });
+    }
+
+    const draft_id = data?.metadata?.draft_id;
+    if (!draft_id)
+      return res.status(400).json({ error: 'MISSING_DRAFT_ID', trace });
+
+    // 5️⃣ Completa la Draft → la orden se marca pagada automáticamente
+    const dc = await draftComplete(draft_id);
+
+    if (dc?.ok && (dc.already_paid || dc.order_id || dc.order_name)) {
+      return res.status(200).json({
+        ok: true,
+        trace,
+        from: 'webhook',
+        note: 'Order ya quedó pagada al completar la Draft',
+        dc
+      });
+    }
+
+    return res.status(200).json({ ok: true, trace, dc });
+  } catch (e) {
+    console.error('[MODO][WEBHOOK][ERR]', trace, e);
+    return res.status(500).json({ error: 'WEBHOOK_FAIL', trace, detail: String(e) });
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────
+
+async function verifySignature(signature) {
+  const res = await fetch(JWKS_URL);
+  const jwks = await res.json();
+  const _jwks = jose.createLocalJWKSet(jwks);
+  const { payload } = await jose.compactVerify(signature, _jwks);
+  return JSON.parse(new TextDecoder().decode(payload));
+}
+
+async function draftComplete(draft_id) {
+  const url = `${APP_URL}/apps/modo/shopify/draft-complete`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draft_id })
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('DRAFT_COMPLETE_FAIL:' + JSON.stringify(data));
+  return data;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Nota: markOrderPaid eliminado. Shopify ya marca la orden pagada
+// automáticamente al completar la Draft.
+// ────────────────────────────────────────────────────────────────
+

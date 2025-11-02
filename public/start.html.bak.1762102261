@@ -32,13 +32,6 @@
     const amount = Number(q.get('amount') || '10');
     const draftIdFromUrl = q.get('draft_id') || null;
     const PROXY_BASE = '/apps/modo';
-
-    let ctx = {};
-    try {
-      const raw = q.get('ctx') || '';
-      ctx = raw ? JSON.parse(decodeURIComponent(escape(atob(raw)))) : {};
-    } catch {}
-
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg) => { $('status').textContent = msg || ''; };
     const setPhase  = (msg) => { $('phase').textContent  = msg || ''; };
@@ -58,18 +51,11 @@
     async function ensureDraft(draftId) {
       if (draftId) return draftId;
       setStatus('Creando borrador de pedido…');
-
       const payload = {
         note: 'Pago con MODO',
         tags: ['modo','qr'],
-        lineItems: Array.isArray(ctx.items) && ctx.items.length
-          ? ctx.items
-          : [{ title: 'Pago MODO', price: amount, quantity: 1 }],
-        customer: ctx.customer || {},
-        shipping_address: ctx.shipping_address || {},
-        shipping_line: ctx.is_pickup ? { title: 'Retiro en tienda', price: 0 } : undefined
+        lineItems: [{ title: 'Pago MODO', price: amount, quantity: 1 }]
       };
-
       const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/shopify/draft-create`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
@@ -91,25 +77,26 @@
       };
     }
 
-    async function completeDraftAndRedirect(draftId) {
-      try {
-        const r = await fetch(`${PROXY_BASE}/shopify/draft-complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draft_id: draftId })
-        });
-        const j = await r.json();
-        if (r.ok && j?.order_status_url) {
-          location.href = j.order_status_url;
-          return true;
+    async function waitOrderUrl(paymentId, timeoutMs = 60000) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < timeoutMs) {
+        const r = await fetch(`${PROXY_BASE}/status/${encodeURIComponent(paymentId)}`);
+        const txt = await r.text();
+        let j = null; try { j = JSON.parse(txt); } catch {}
+        if (r.ok && j) {
+          const url   = j.order_status_url;
+          const state = String(j.status || j.state || '').toUpperCase();
+          if (url) return url;
+          if (state === 'REJECTED' || state === 'CANCELLED') throw new Error('Pago rechazado/cancelado');
         }
-      } catch(e) {}
-      location.href = `/checkout`;
-      return false;
+        await new Promise(res => setTimeout(res, 1500));
+      }
+      return null;
     }
 
     async function showModo(draftId) {
       const data = await createPaymentIntention(draftId);
+      const paymentId = data.checkoutId;
       const origin = location.origin;
 
       const modalObject = {
@@ -119,14 +106,22 @@
         deeplink: data.deeplink ? {
           url: data.deeplink,
           callbackURL: `${origin}/cart`,
-          callbackURLSuccess: `${origin}/checkout`
+          callbackURLSuccess: `${origin}/pages/gracias`
         } : undefined,
-        callbackURL: `${origin}/checkout`,
+        callbackURL: `${origin}/pages/gracias`,
         refreshData: async () => {
           const d = await createPaymentIntention(draftId);
           return { checkoutId: d.checkoutId, qrString: d.qrString, deeplink: d.deeplink ? { url: d.deeplink } : undefined };
         },
-        onSuccess: async () => { await completeDraftAndRedirect(draftId); },
+        onSuccess: async () => {
+          try {
+            const thank = await waitOrderUrl(paymentId);
+            if (thank) location.href = thank;
+            else location.href = `${origin}/pages/gracias`;
+          } catch {
+            location.href = `${origin}/pages/gracias`;
+          }
+        },
         onFailure: () => location.href = `${origin}/checkout`,
         onCancel:  () => location.href = `${origin}/checkout`,
         onClose:   () => location.href = `${origin}/checkout`,
@@ -151,7 +146,7 @@
         const draftId = await ensureDraft(draftIdFromUrl);
         setPhase('Listo. Escaneá el QR o abrí la app MODO.');
         $('openModo').onclick = () => showModo(draftId);
-        $('doneBtn').onclick = () => completeDraftAndRedirect(draftId);
+        $('doneBtn').onclick = () => location.href = `/pages/modo-success?draft_id=${encodeURIComponent(draftId)}`;
         await showModo(draftId);
       } catch (e) {
         console.error(e);
@@ -164,3 +159,4 @@
   </script>
 </body>
 </html>
+

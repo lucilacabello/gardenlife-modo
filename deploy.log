@@ -1,0 +1,91 @@
+2025-11-02T00:39:24.977Z: Running command app deploy
+2025-11-02T00:39:24.981Z: Running system process in background:
+  · Command: /Users/lucilacabello/.nvm/versions/node/v22.19.0/bin/node /Users/lucilacabello/.nvm/versions/node/v22.19.0/bin/shopify notifications list --ignore-errors
+  · Working directory: /Users/lucilacabello/gardenlife-modo
+
+2025-11-02T00:39:24.987Z: Notifications to show: 0
+2025-11-02T00:39:25.006Z: Reading cached app information for directory /Users/lucilacabello/gardenlife-modo...
+2025-11-02T00:39:25.008Z: Reading the content of file at shopify.app.toml...
+2025-11-02T00:39:25.016Z: Reading the content of file at shopify.app.toml...
+╭─ error ──────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Flag not specified:                                                         │
+│                                                                              │
+│  force                                                                       │
+│                                                                              │
+│  This flag is required in non-interactive terminal environments, such as a   │
+│  CI environment, or when piping input from another process.                  │
+│                                                                              │
+│  To resolve this, specify the option in the command, or run the command in   │
+│  an interactive environment such as your local terminal.                     │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+2025-11-02T00:39:25.070Z: Running system process:
+  · Command: npm prefix
+  · Working directory: /Users/lucilacabello/gardenlife-modo
+
+2025-11-02T00:39:25.235Z: Obtaining the dependency manager in directory /Users/lucilacabello/gardenlife-modo...
+2025-11-02T00:39:25.360Z: Getting current session ID...
+2025-11-02T00:39:25.362Z: Getting current session ID...
+2025-11-02T00:39:25.662Z: Request to https://monorail-edge.shopifysvc.com/v1/produce completed in 278 ms
+With response headers:
+ - x-request-id: cb9581da-1ffc-4a9a-ad5d-e1d21cb492e7
+    
+2025-11-02T00:39:25.663Z: Analytics event sent: {
+  "command": "app deploy",
+  "time_start": 1762043964978,
+  "time_end": 1762043965067,
+  "total_time": 89,
+  "success": false,
+  "cli_version": "3.86.1",
+  "ruby_version": "",
+  "node_version": "22.19.0",
+  "is_employee": false,
+  "uname": "darwin arm64",
+  "env_ci": false,
+  "env_plugin_installed_any_custom": false,
+  "env_plugin_installed_shopify": "[\"@shopify/cli\"]",
+  "env_shell": "zsh",
+  "env_device_id": "3bad1a6cdb15a6c179492dabe5ac51223184db22",
+  "env_cloud": "localhost",
+  "env_package_manager": "npm",
+  "env_is_global": true,
+  "env_auth_method": "device_auth",
+  "env_is_wsl": false,
+  "env_build_repository": "Shopify/cli",
+  "cmd_app_warning_api_key_deprecation_displayed": false,
+  "cmd_deploy_flag_message_used": false,
+  "cmd_deploy_flag_version_used": false,
+  "cmd_deploy_flag_source_url_used": false,
+  "cmd_all_timing_network_ms": 0,
+  "cmd_all_timing_prompts_ms": 0,
+  "cmd_all_launcher": "unknown",
+  "cmd_all_topic": "app",
+  "cmd_all_plugin": "@shopify/app",
+  "cmd_all_force": false,
+  "cmd_all_verbose": true,
+  "cmd_all_path_override": true,
+  "cmd_all_path_override_hash": "f67ea2125723d9ae78a9fcc15faf1a908e5d3502",
+  "cmd_app_reset_used": false,
+  "cmd_all_timing_active_ms": 89,
+  "cmd_all_exit": "expected_error",
+  "user_id": "6da034f3-eff0-45a0-9893-205b9a61c98e",
+  "request_ids": [],
+  "args": "--verbose",
+  "error_message": "Flag not specified:\n\nforce\n\nThis flag is required in non-interactive terminal environments, such as a CI environment, or when piping input from another process.",
+  "env_plugin_installed_all": "[\"@shopify/cli\"]",
+  "metadata": "{\"extraPublic\":{},\"extraSensitive\":{}}"
+}
+2025-11-02T00:39:25.693Z: Getting current session ID...
+2025-11-02T00:39:25.694Z: Reporting handled error to Bugsnag: Flag not specified:
+
+force
+
+This flag is required in non-interactive terminal environments, such as a CI environment, or when piping input from another process.
+2025-11-02T00:39:26.087Z: Running system process:
+  · Command: npm prefix
+  · Working directory: /Users/lucilacabello/gardenlife-modo
+
+2025-11-02T00:39:26.224Z: Obtaining the dependency manager in directory /Users/lucilacabello/gardenlife-modo...
+2025-11-02T00:39:26.224Z: Getting current session ID...

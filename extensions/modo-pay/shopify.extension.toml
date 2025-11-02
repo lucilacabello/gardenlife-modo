@@ -1,0 +1,16 @@
+api_version = "2025-07"
+
+[[extensions]]
+uid = "68df2874-06f0-4fb4-20ec-035b5898022a0df2727e"
+type = "ui_extension"
+name = "Pagar con MODO"
+handle = "modo-pay-block-gl"
+
+[[extensions.targeting]]
+target = "purchase.checkout.block.render"
+module = "./src/index.jsx"
+
+[extensions.capabilities]
+network_access = true
+# Si tu bloque puede impedir avanzar el checkout cuando falta algo, habilita:
+# block_progress = true

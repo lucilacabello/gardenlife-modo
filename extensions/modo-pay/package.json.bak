@@ -1,15 +1,18 @@
 {
   "name": "modo-pay",
   "private": true,
+  "type": "module",
   "version": "1.0.0",
-  "license": "UNLICENSED",
   "dependencies": {
-    "react": "^18.0.0",
-    "@shopify/ui-extensions": "2025.7.x",
-    "@shopify/ui-extensions-react": "2025.7.x",
-    "react-reconciler": "0.29.0"
+    "@shopify/ui-extensions-react": "^2025.7.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-reconciler": "^0.29.2"
+  },
+  "scripts": {
+    "build": "mkdir -p dist && esbuild src/index.jsx --bundle --format=esm --jsx=automatic --outdir=dist"
   },
   "devDependencies": {
-    "@types/react": "^18.0.0"
+    "esbuild": "^0.25.11"
   }
 }

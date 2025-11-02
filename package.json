@@ -6,5 +6,8 @@
   "scripts": {
     "build": "echo build-root-ok",
     "dev": "vercel dev"
+  },
+  "dependencies": {
+    "jose": "^6.1.0"
   }
 }
