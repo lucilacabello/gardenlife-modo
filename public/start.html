@@ -32,6 +32,7 @@
     const amount = Number(q.get('amount') || '10');
     const draftIdFromUrl = q.get('draft_id') || null;
     const PROXY_BASE = '/apps/modo';
+    const mode = (q.get('mode') || '').toLowerCase();
 
     let ctx = {};
     try {
@@ -56,6 +57,7 @@
     }
 
     async function ensureDraft(draftId) {
+      if (mode === "ty") return null;
       if (draftId) return draftId;
       setStatus('Creando borrador de pedido…');
       const payload = {
@@ -80,7 +82,7 @@
       setStatus('Creando intención de pago…');
       const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/payment-request`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, draft_id: draftId })
+        body: JSON.stringify(mode === "ty" ? { amount } : { amount, draft_id: draftId })
       });
       if (!ok) { logDebug(raw || json); throw new Error('Error al crear el pago'); }
       return {
@@ -117,17 +119,17 @@
         deeplink: data.deeplink ? {
           url: data.deeplink,
           callbackURL: `${origin}/cart`,
-          callbackURLSuccess: `${origin}/checkout`
+          callbackURLSuccess: (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`)
         } : undefined,
-        callbackURL: `${origin}/checkout`,
+        callbackURL: (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`),
         refreshData: async () => {
           const d = await createPaymentIntention(draftId);
           return { checkoutId: d.checkoutId, qrString: d.qrString, deeplink: d.deeplink ? { url: d.deeplink } : undefined };
         },
         onSuccess: async () => { await completeDraftAndRedirect(draftId); },
-        onFailure: () => location.href = `${origin}/checkout`,
-        onCancel:  () => location.href = `${origin}/checkout`,
-        onClose:   () => location.href = `${origin}/checkout`,
+        onFailure: () => location.href = (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`),
+        onCancel:  () => location.href = (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`),
+        onClose:   () => location.href = (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`),
       };
 
       if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
@@ -149,7 +151,7 @@
         const draftId = await ensureDraft(draftIdFromUrl);
         setPhase('Listo. Escaneá el QR o abrí la app MODO.');
         $('openModo').onclick = () => showModo(draftId);
-        $('doneBtn').onclick = () => completeDraftAndRedirect(draftId);
+        $('doneBtn').onclick = () => { if (mode === 'ty') location.href = `/account/orders`; else completeDraftAndRedirect(draftId); };
         await showModo(draftId);
       } catch (e) {
         console.error(e);

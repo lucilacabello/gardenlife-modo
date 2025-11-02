@@ -14,16 +14,3 @@ module = "./src/index.jsx"
 network_access = true
 # Si tu bloque puede impedir avanzar el checkout cuando falta algo, habilita:
 # block_progress = true
-# -------- BLOQUE THANK-YOU (NUEVO) --------
-[[extensions]]
-uid = "modo-pay-thankyou"
-type = "ui_extension"
-name = "MODO en Thank-You"
-handle = "modo-pay-thankyou"
-
-[[extensions.targeting]]
-target = "purchase.thank-you.block.render"
-module = "./src/thankyou.jsx"
-
-[extensions.capabilities]
-network_access = true
