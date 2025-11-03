@@ -24,8 +24,11 @@ function ModoThankYou() {
   const amountNum = Number(raw);
   const amount = Number.isFinite(amountNum) && amountNum > 0 ? fmt(amountNum) : "0.00";
 
-  // Cambiar: usar orderNumber (string visible) en vez de order.id (vacío)
-  const orderNumber = api?.checkout?.order?.orderNumber ?? "";
+  // Log para debug completo del checkout
+  console.log('API checkout data:', JSON.stringify(api.checkout));
+
+  // Intenta leer orderNumber o nombre visible
+  const orderNumber = api?.checkout?.order?.orderNumber ?? api?.checkout?.order?.name ?? "";
 
   console.log('ThankYou Modo - amount:', amount);
   console.log('ThankYou Modo - orderNumber:', orderNumber);
