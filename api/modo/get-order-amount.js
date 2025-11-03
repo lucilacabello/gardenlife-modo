@@ -1,86 +1,71 @@
-/**
- * GET /apps/modo/get-order-amount?orderId=<GID_o_numérico>
- * Devuelve: { amount: number, currency: "ARS" }
- *
- * - Acepta GID: "gid://shopify/Order/1234567890" o ID numérico "1234567890"
- * - Usa Shopify Admin REST. Requiere:
- *   SHOPIFY_SHOP_DOMAIN, SHOPIFY_ADMIN_TOKEN
- */
 export default async function handler(req, res) {
+  const trace = `A-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
   try {
-    if (req.method !== "GET") {
-      return res.status(405).json({ error: "METHOD_NOT_ALLOWED" });
+    if (req.method !== 'GET') {
+      return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
 
-    const orderIdRaw = String(req.query?.orderId || "").trim();
-    if (!orderIdRaw) {
-      return res.status(400).json({ error: "MISSING_ORDER_ID" });
+    // --- Autorización suave: x-api-key opcional o referer del dominio ---
+    const apiKey = req.headers['x-api-key'];
+    const referer = req.headers['referer'] || '';
+    const REQUIRED_KEY = process.env.INTERNAL_API_KEY || '';
+    const ALLOWED_HOST = process.env.ALLOWED_PROXY_HOST || 'gardenlife.com.ar';
+
+    const authorized =
+      (REQUIRED_KEY ? apiKey === REQUIRED_KEY : true) || referer.includes(ALLOWED_HOST);
+
+    if (!authorized) {
+      return res.status(401).json({ error: 'UNAUTHORIZED' });
     }
 
-    const shop =
-      process.env.SHOPIFY_SHOP_DOMAIN ||
-      process.env.SHOP ||
-      process.env.SHOPIFY_SHOP ||
-      process.env.SHOPIFY_DOMAIN;
-
-    const token =
-      process.env.SHOPIFY_ADMIN_TOKEN ||
-      process.env.SHOPIFY_ACCESS_TOKEN ||
-      process.env.PRIVATE_SHOPIFY_ACCESS_TOKEN;
-
-    if (!shop || !token) {
-      return res.status(500).json({ error: "MISSING_SHOP_ENV", shop: !!shop, token: !!token });
+    const { orderId } = req.query || {};
+    if (!orderId) {
+      return res.status(400).json({ error: 'MISSING_ORDER_ID' });
     }
 
-    // Soporta GID o numérico
-    const match = orderIdRaw.match(/(\d+)$/);
-    const numericId = match ? match[1] : null;
+    // Acepta GID o numérico
+    const numericId = String(orderId).includes('/Order/')
+      ? String(orderId).split('/').pop()
+      : String(orderId).replace(/\D+/g, '');
+
     if (!numericId) {
-      return res.status(400).json({ error: "INVALID_ORDER_ID_FORMAT", orderIdRaw });
+      return res.status(400).json({ error: 'INVALID_ORDER_ID' });
     }
 
-    // Admin REST
-    const url = `https://${shop}/admin/api/2025-07/orders/${numericId}.json`;
+    const store = process.env.SHOPIFY_STORE || ''; // ej: gardenlife-com-ar.myshopify.com
+    const token = process.env.SHOPIFY_ADMIN_TOKEN || '';
+
+    if (!store || !token) {
+      return res.status(500).json({ error: 'MISSING_SHOPIFY_ENV' });
+    }
+
+    // REST Admin 2025-07 (traemos total_price listo)
+    const url = `https://${store}/admin/api/2025-07/orders/${numericId}.json?fields=total_price,currency`;
     const r = await fetch(url, {
-      method: "GET",
       headers: {
-        "X-Shopify-Access-Token": token,
-        "Content-Type": "application/json",
-      },
+        'X-Shopify-Access-Token': token,
+        'Content-Type': 'application/json'
+      }
     });
 
-    // Rate limit simple (reintento 1 vez)
-    if (r.status === 429) {
-      const retry = Number(r.headers.get("Retry-After") || 2);
-      await new Promise((resolve) => setTimeout(resolve, retry * 1000));
-      const rr = await fetch(url, {
-        method: "GET",
-        headers: {
-          "X-Shopify-Access-Token": token,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!rr.ok) {
-        const txt = await rr.text();
-        return res.status(rr.status).json({ error: "RATE_LIMIT", detail: txt });
-      }
-      const j2 = await rr.json();
-      const amount2 = Number(j2?.order?.total_price ?? 0);
-      const currency2 = j2?.order?.currency || "ARS";
-      return res.json({ amount: amount2, currency: currency2, order_name: j2?.order?.name });
-    }
-
+    const txt = await r.text();
     if (!r.ok) {
-      const txt = await r.text();
-      return res.status(r.status).json({ error: "SHOPIFY_FETCH_FAILED", detail: txt });
+      return res.status(r.status).json({ error: 'SHOPIFY_ERROR', raw: txt });
     }
 
-    const j = await r.json();
-    const amount = Number(j?.order?.total_price ?? 0);
-    const currency = j?.order?.currency || "ARS";
-    return res.json({ amount, currency, order_name: j?.order?.name });
-  } catch (err) {
-    console.error("[get-order-amount]", err);
-    return res.status(500).json({ error: err?.message || "INTERNAL_ERROR" });
+    let data = {};
+    try { data = JSON.parse(txt); } catch {}
+
+    const totalStr = data?.order?.total_price;
+    const currency = data?.order?.currency || 'ARS';
+    const amount = Number(totalStr);
+
+    if (!isFinite(amount) || amount <= 0) {
+      return res.status(422).json({ error: 'INVALID_AMOUNT', raw: data });
+    }
+
+    return res.status(200).json({ ok: true, amount, currency, trace });
+  } catch (e) {
+    return res.status(500).json({ error: 'UNEXPECTED', message: e?.message || String(e) });
   }
 }

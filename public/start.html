@@ -6,11 +6,11 @@
   <title>Pago con MODO - Gardenlife</title>
   <script src="https://ecommerce-modal.modo.com.ar/bundle.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; text-align:center; margin:32px; }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; text-align:center; margin:32px; }
     .muted { color:#666; font-size:14px; }
     #debug { display:none; white-space:pre-wrap; font-size:12px; text-align:left; background:#f7f7f7; border:1px solid #e3e3e3; border-radius:8px; padding:12px; margin:16px auto; max-width:720px; }
     .btn { display:none; margin:8px; padding:10px 16px; border:0; border-radius:8px; background:#2E7D32; color:#fff; cursor:pointer; }
-    .spinner { margin: 16px auto; border: 4px solid #ddd; border-top-color: #2E7D32; border-radius: 50%; width: 36px; height: 36px; animation: spin 0.8s linear infinite; }
+    .spinner { margin:16px auto; border:4px solid #ddd; border-top-color:#2E7D32; border-radius:50%; width:36px; height:36px; animation:spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     #errorBanner{display:none;color:#fff;background:#d32f2f;padding:8px;border-radius:6px;margin:10px auto;max-width:720px;}
   </style>
@@ -18,7 +18,7 @@
 <body>
   <script>
     if (location.hostname.endsWith('vercel.app')) {
-      location.href = \`https://gardenlife.com.ar/apps/modo/start.html\${location.search}\`;
+      location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
     }
   </script>
 
@@ -36,7 +36,7 @@
     const q = new URLSearchParams(location.search);
     const mode = (q.get('mode') || '').toLowerCase();
     const orderId = q.get('orderId') || '';
-    let amount = 0; // Forzamos el uso de backend para obtener monto correcto
+    let amount = 0;
 
     const PROXY_BASE = '/apps/modo';
     const $ = (id) => document.getElementById(id);
@@ -58,29 +58,20 @@
       catch { return { ok: res.ok, status: res.status, json: null, raw: txt }; }
     }
 
-    async function resolveAmountIfNeeded() {
-      if (amount > 0) return amount;
-      if (orderId) {
-        setStatus('Consultando monto de la orden…');
-        const { ok, json, raw } = await fetchJSON(\`\${PROXY_BASE}/get-order-amount?orderId=\${encodeURIComponent(orderId)}\`);
-        if (!ok || !json?.amount) {
-          logDebug(raw || json);
-          throw new Error('No se pudo obtener el monto de la orden');
-        }
-        amount = Number(json.amount || 0);
-        return amount;
-      }
-      throw new Error('Falta el monto. Volvé atrás e intentá nuevamente.');
+    async function resolveAmount() {
+      if (!orderId) throw new Error('Falta orderId.');
+      setStatus('Consultando monto de la orden…');
+      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/get-order-amount?orderId=${encodeURIComponent(orderId)}`);
+      if (!ok || !json?.amount) { logDebug(raw || json); throw new Error('No se pudo obtener el monto.'); }
+      amount = Number(json.amount || 0);
+      if (!isFinite(amount) || amount <= 0) throw new Error('Monto inválido.');
+      return amount;
     }
 
-    async function ensureDraft(draftId){ return null; }
-
-    async function createPaymentIntention(draftId) {
+    async function createPaymentIntention() {
       setStatus('Creando intención de pago…');
-      const body = (mode === 'ty')
-        ? { amount }
-        : { amount, draft_id: draftId };
-      const { ok, json, raw } = await fetchJSON(\`\${PROXY_BASE}/payment-request\`, {
+      const body = (mode === 'ty') ? { amount } : { amount };
+      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/payment-request`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       if (!ok) { logDebug(raw || json); throw new Error('Error al crear el pago'); }
@@ -91,44 +82,23 @@
       };
     }
 
-    async function completeDraftAndRedirect(draftId) {
-      try {
-        const r = await fetch(\`\${PROXY_BASE}/shopify/draft-complete\`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draft_id: draftId })
-        });
-        const j = await r.json();
-        if (r.ok && j?.order_status_url) {
-          location.href = j.order_status_url;
-          return true;
-        }
-      } catch(e) {}
-      location.href = '/checkout';
-      return false;
-    }
-
-    async function showModo(draftId) {
-      const data = await createPaymentIntention(draftId);
+    async function showModo() {
+      const data = await createPaymentIntention();
       const origin = location.origin;
       const modalObject = {
         version: '2',
         checkoutId: data.checkoutId,
         qrString: data.qrString,
-        deeplink: data.deeplink ? {
-          url: data.deeplink,
-          callbackURL: \`\${origin}/cart\`,
-          callbackURLSuccess: (mode === 'ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`)
-        } : undefined,
-        callbackURL: (mode === 'ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
+        deeplink: data.deeplink ? { url: data.deeplink, callbackURL: `${origin}/cart`, callbackURLSuccess: `${origin}/account/orders` } : undefined,
+        callbackURL: `${origin}/account/orders`,
         refreshData: async () => {
-          const d = await createPaymentIntention(draftId);
+          const d = await createPaymentIntention();
           return { checkoutId: d.checkoutId, qrString: d.qrString, deeplink: d.deeplink ? { url: d.deeplink } : undefined };
         },
-        onSuccess: async () => { if (mode==='ty') { setStatus('Pago confirmado ✅'); } else { await completeDraftAndRedirect(draftId); } },
-        onFailure: () => location.href = (mode==='ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
-        onCancel:  () => location.href = (mode==='ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
-        onClose:   () => location.href = (mode==='ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
+        onSuccess: () => { setStatus('Pago confirmado ✅'); },
+        onFailure: () => { setStatus('Pago fallido'); },
+        onCancel:  () => { setStatus('Pago cancelado'); },
+        onClose:   () => { /* no redirect for TY */ }
       };
 
       if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
@@ -137,8 +107,8 @@
         const img = new Image();
         img.alt = 'QR de pago MODO';
         img.style.maxWidth = '260px';
-        img.src = \`https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=\${encodeURIComponent(data.qrString)}\`;
-        ($('debug') || document.body).appendChild(img);
+        img.src = `https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=${encodeURIComponent(data.qrString)}`;
+        (document.body).appendChild(img);
         setStatus('Escaneá el QR o abrí la app MODO.');
         logDebug('SDK MODO no disponible. Mostrando QR estático.');
       }
@@ -148,24 +118,21 @@
     (async () => {
       showSpinner(true);
       try {
-        if (amount <= 0) {
-          await resolveAmountIfNeeded();
-        }
+        await resolveAmount();
         $('amountText').textContent = amount.toFixed(2);
-        setPhase(mode==='ty' ? 'Listo. Abrí la app o escaneá el QR para pagar.' : 'Creando borrador y preparando pago…');
-        $('openModo').onclick = () => showModo(null);
-        $('doneBtn').style.display = (mode==='ty') ? 'none' : 'inline-block';
-        $('doneBtn').onclick = () => completeDraftAndRedirect(null);
-        await showModo(null);
-        showSpinner(false);
+        setPhase('Listo. Abrí la app o escaneá el QR para pagar.');
+        $('openModo').onclick = () => showModo();
+        $('doneBtn').style.display = 'none';
+        await showModo();
       } catch (e) {
         console.error(e);
-        showSpinner(false);
         setPhase('Error al preparar el pago.');
         setStatus(e?.message || 'Error inesperado');
         showError('Ocurrió un error al generar el QR. Intentá nuevamente.');
         logDebug(e);
         showBtns();
+      } finally {
+        showSpinner(false);
       }
     })();
   </script>

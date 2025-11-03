@@ -11,14 +11,8 @@ export default reactExtension("purchase.thank-you.block.render", () => <ModoThan
 
 function ModoThankYou() {
   const api = useExtensionApi();
-
-  // Obtenemos solo el orderId, para dejar que start.html consulte monto correcto
-  const orderId =
-    (api?.checkout && api.checkout.order && api.checkout.order.id) || ""; // Puede venir como GID
-
+  const orderId = api?.checkout?.order?.id || "";
   const base = "https://gardenlife.com.ar/apps/modo/start.html?mode=ty";
-
-  // URL sin parámetro amount, solo orderId para consulta backend
   const url = orderId ? `${base}&orderId=${encodeURIComponent(orderId)}` : base;
 
   return (
