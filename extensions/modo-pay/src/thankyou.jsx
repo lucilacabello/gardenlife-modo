@@ -24,13 +24,13 @@ function ModoThankYou() {
   const amountNum = Number(raw);
   const amount = Number.isFinite(amountNum) && amountNum > 0 ? fmt(amountNum) : "0.00";
 
-  const orderId = api?.checkout?.order?.id ?? "";
+  // Cambiar: usar orderNumber (string visible) en vez de order.id (vacío)
+  const orderNumber = api?.checkout?.order?.orderNumber ?? "";
 
-  // Logs para debug - revisa consola navegador en Thank You
   console.log('ThankYou Modo - amount:', amount);
-  console.log('ThankYou Modo - orderId:', orderId);
+  console.log('ThankYou Modo - orderNumber:', orderNumber);
 
-  const url = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${encodeURIComponent(amount)}&orderId=${encodeURIComponent(orderId)}`;
+  const url = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${encodeURIComponent(amount)}&orderNumber=${encodeURIComponent(orderNumber)}`;
 
   return (
     <BlockStack spacing="loose">
