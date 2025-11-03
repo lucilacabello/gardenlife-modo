@@ -17,9 +17,8 @@
 </head>
 <body>
   <script>
-    // si abre en vercel, redirigir al proxy de Shopify
     if (location.hostname.endsWith('vercel.app')) {
-      location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
+      location.href = \`https://gardenlife.com.ar/apps/modo/start.html\${location.search}\`;
     }
   </script>
 
@@ -36,8 +35,8 @@
   <script>
     const q = new URLSearchParams(location.search);
     const mode = (q.get('mode') || '').toLowerCase();
-    const orderId = q.get('orderId') || '';      // puede venir GID o numérico
-    let amount = Number(q.get('amount') || '0'); // si ya viene, lo usamos
+    const orderId = q.get('orderId') || '';
+    let amount = 0; // Forzamos el uso de backend para obtener monto correcto
 
     const PROXY_BASE = '/apps/modo';
     const $ = (id) => document.getElementById(id);
@@ -63,7 +62,7 @@
       if (amount > 0) return amount;
       if (orderId) {
         setStatus('Consultando monto de la orden…');
-        const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/get-order-amount?orderId=${encodeURIComponent(orderId)}`);
+        const { ok, json, raw } = await fetchJSON(\`\${PROXY_BASE}/get-order-amount?orderId=\${encodeURIComponent(orderId)}\`);
         if (!ok || !json?.amount) {
           logDebug(raw || json);
           throw new Error('No se pudo obtener el monto de la orden');
@@ -74,7 +73,6 @@
       throw new Error('Falta el monto. Volvé atrás e intentá nuevamente.');
     }
 
-    // En "ty" no creamos draft
     async function ensureDraft(draftId){ return null; }
 
     async function createPaymentIntention(draftId) {
@@ -82,20 +80,20 @@
       const body = (mode === 'ty')
         ? { amount }
         : { amount, draft_id: draftId };
-      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/payment-request`, {
+      const { ok, json, raw } = await fetchJSON(\`\${PROXY_BASE}/payment-request\`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       if (!ok) { logDebug(raw || json); throw new Error('Error al crear el pago'); }
       return {
         checkoutId: json.id,
         qrString:   json.qr,
-        deeplink:   typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null)
+        deeplink: typeof json.deeplink === 'string' ? json.deeplink : (json.deeplink?.url || null)
       };
     }
 
     async function completeDraftAndRedirect(draftId) {
       try {
-        const r = await fetch(`${PROXY_BASE}/shopify/draft-complete`, {
+        const r = await fetch(\`\${PROXY_BASE}/shopify/draft-complete\`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ draft_id: draftId })
@@ -106,7 +104,7 @@
           return true;
         }
       } catch(e) {}
-      location.href = `/checkout`;
+      location.href = '/checkout';
       return false;
     }
 
@@ -119,18 +117,18 @@
         qrString: data.qrString,
         deeplink: data.deeplink ? {
           url: data.deeplink,
-          callbackURL: `${origin}/cart`,
-          callbackURLSuccess: (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`)
+          callbackURL: \`\${origin}/cart\`,
+          callbackURLSuccess: (mode === 'ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`)
         } : undefined,
-        callbackURL: (mode === 'ty' ? `${origin}/account/orders` : `${origin}/checkout`),
+        callbackURL: (mode === 'ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
         refreshData: async () => {
           const d = await createPaymentIntention(draftId);
           return { checkoutId: d.checkoutId, qrString: d.qrString, deeplink: d.deeplink ? { url: d.deeplink } : undefined };
         },
         onSuccess: async () => { if (mode==='ty') { setStatus('Pago confirmado ✅'); } else { await completeDraftAndRedirect(draftId); } },
-        onFailure: () => location.href = (mode==='ty' ? `${origin}/account/orders` : `${origin}/checkout`),
-        onCancel:  () => location.href = (mode==='ty' ? `${origin}/account/orders` : `${origin}/checkout`),
-        onClose:   () => location.href = (mode==='ty' ? `${origin}/account/orders` : `${origin}/checkout`),
+        onFailure: () => location.href = (mode==='ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
+        onCancel:  () => location.href = (mode==='ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
+        onClose:   () => location.href = (mode==='ty' ? \`\${origin}/account/orders\` : \`\${origin}/checkout\`),
       };
 
       if (window.ModoSDK && typeof ModoSDK.modoInitPayment === 'function') {
@@ -139,27 +137,12 @@
         const img = new Image();
         img.alt = 'QR de pago MODO';
         img.style.maxWidth = '260px';
-        img.src = `https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=${encodeURIComponent(data.qrString)}`;
+        img.src = \`https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=\${encodeURIComponent(data.qrString)}\`;
         ($('debug') || document.body).appendChild(img);
         setStatus('Escaneá el QR o abrí la app MODO.');
         logDebug('SDK MODO no disponible. Mostrando QR estático.');
       }
       showBtns();
-    }
-
-    // MONITOREO opcional (si querés activar, descomenta pollPaymentStatus)
-    async function pollPaymentStatus(id) {
-      const timer = setInterval(async () => {
-        try {
-          const r = await fetch(`${PROXY_BASE}/status/${id}`);
-          if (!r.ok) return;
-          const j = await r.json();
-          if (['PAID','COMPLETED','APPROVED'].includes(String(j.status || '').toUpperCase())) {
-            clearInterval(timer);
-            setStatus('✅ Pago acreditado');
-          }
-        } catch {}
-      }, 15000);
     }
 
     (async () => {
