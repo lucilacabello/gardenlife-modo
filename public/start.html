@@ -1,17 +1,71 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pago con MODO - Gardenlife</title>
   <script src="https://ecommerce-modal.modo.com.ar/bundle.js"></script>
   <style>
-    /* estilo igual */
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      text-align: center;
+      margin: 32px;
+    }
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+    #debug {
+      display: none;
+      white-space: pre-wrap;
+      font-size: 12px;
+      text-align: left;
+      background: #f7f7f7;
+      border: 1px solid #e3e3e3;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 16px auto;
+      max-width: 720px;
+    }
+    .btn {
+      display: none;
+      margin: 8px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: #2E7D32;
+      color: #fff;
+      cursor: pointer;
+    }
+    .spinner {
+      margin: 16px auto;
+      border: 4px solid #ddd;
+      border-top-color: #2E7D32;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    #errorBanner {
+      display: none;
+      color: #fff;
+      background: #d32f2f;
+      padding: 8px;
+      border-radius: 6px;
+      margin: 10px auto;
+      max-width: 720px;
+    }
   </style>
 </head>
 <body>
   <script>
-    if (location.hostname.endsWith('vercel.app')) {
+    // Si se abre desde vercel.app, redirige al dominio oficial
+    if (location.hostname.endsWith("vercel.app")) {
       location.href = `https://gardenlife.com.ar/apps/modo/start.html${location.search}`;
     }
   </script>
@@ -28,53 +82,152 @@
 
   <script>
     const q = new URLSearchParams(location.search);
-    const mode = (q.get('mode') || '').toLowerCase();
-    const orderNumber = q.get('orderNumber') || '';
-    const amountFromUrl = Number(String(q.get('amount') || '0').replace(',', '.'));
-    let amount = 0;
+    const amount = Number(q.get("amount") || 0);
+    const draftId = q.get("draft_id") || null;
+    const PROXY_BASE = "/apps/modo";
+    const $ = (id) => document.getElementById(id);
 
-    console.log('start.html - Parámetros recibidos:', { mode, orderNumber, amountFromUrl });
-
-    const PROXY_BASE = '/apps/modo';
-    const $ = id => document.getElementById(id);
-
-    function showSpinner(show) { $('spinner').style.display = show ? 'block' : 'none'; }
-    function showError(msg) { const el = $('errorBanner'); el.textContent = msg; el.style.display = 'block'; }
-    const setStatus = msg => { $('status').textContent = msg || ''; };
-    const setPhase = msg => { $('phase').textContent = msg || ''; };
-    const showBtns = () => { $('openModo').style.display = 'inline-block'; if (mode !== 'ty') $('doneBtn').style.display = 'inline-block'; };
-    const logDebug = obj => {
-      try { obj = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); } catch {}
-      const el = $('debug'); el.style.display = 'block'; el.textContent = String(obj).slice(0, 8000);
+    function showSpinner(show) {
+      $("spinner").style.display = show ? "block" : "none";
+    }
+    function showError(msg) {
+      const el = $("errorBanner");
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+    const setStatus = (msg) => {
+      $("status").textContent = msg || "";
+    };
+    const setPhase = (msg) => {
+      $("phase").textContent = msg || "";
+    };
+    const showBtns = () => {
+      $("openModo").style.display = $("doneBtn").style.display = "inline-block";
+    };
+    const logDebug = (obj) => {
+      try {
+        obj = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+      } catch {}
+      const el = $("debug");
+      el.style.display = "block";
+      el.textContent = String(obj).slice(0, 8000);
     };
 
     async function fetchJSON(url, init) {
       const res = await fetch(url, init);
       const txt = await res.text();
-      try { return { ok: res.ok, status: res.status, json: JSON.parse(txt), raw: txt }; }
-      catch { return { ok: res.ok, status: res.status, json: null, raw: txt }; }
+      try {
+        return { ok: res.ok, status: res.status, json: JSON.parse(txt), raw: txt };
+      } catch {
+        return { ok: res.ok, status: res.status, json: null, raw: txt };
+      }
     }
 
-    async function resolveAmountIfNeeded() {
-      if (Number.isFinite(amountFromUrl) && amountFromUrl > 0) {
-        amount = amountFromUrl;
-        return amount;
+    async function createPaymentIntention() {
+      setStatus("Creando intención de pago…");
+      const body = draftId ? { amount, draft_id: draftId } : { amount };
+      const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/payment-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!ok) {
+        logDebug(raw || json);
+        throw new Error("Error al crear el pago");
       }
-      if (orderNumber) {
-        setStatus('Consultando monto de la orden…');
-        const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/get-order-amount?orderNumber=${encodeURIComponent(orderNumber)}`);
-        if (!ok || !json?.amount) {
-          logDebug(raw || json);
-          throw new Error('No se pudo obtener el monto de la orden');
+      return {
+        checkoutId: json.id,
+        qrString: json.qr,
+        deeplink: typeof json.deeplink === "string" ? json.deeplink : json.deeplink?.url || null,
+      };
+    }
+
+    async function completeDraftAndRedirect() {
+      try {
+        const r = await fetch(`${PROXY_BASE}/shopify/draft-complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draft_id: draftId }),
+        });
+        const j = await r.json();
+        if (r.ok && j?.order_status_url) {
+          location.href = j.order_status_url;
+          return true;
         }
-        amount = Number(json.amount || 0);
-        return amount;
-      }
-      throw new Error('No se recibió el monto. Volvé a la página anterior e intentá nuevamente.');
+      } catch (e) {}
+      location.href = "/checkout";
+      return false;
     }
 
-    // resto igual (createPaymentIntention, showModo, etc.)...
+    async function showModo() {
+      const data = await createPaymentIntention();
+      const origin = location.origin;
+      const modalObject = {
+        version: "2",
+        checkoutId: data.checkoutId,
+        qrString: data.qrString,
+        deeplink: data.deeplink
+          ? {
+              url: data.deeplink,
+              callbackURL: `${origin}/cart`,
+              callbackURLSuccess: `${origin}/checkout`,
+            }
+          : undefined,
+        callbackURL: `${origin}/checkout`,
+        refreshData: async () => {
+          const d = await createPaymentIntention();
+          return {
+            checkoutId: d.checkoutId,
+            qrString: d.qrString,
+            deeplink: d.deeplink ? { url: d.deeplink } : undefined,
+          };
+        },
+        onSuccess: async () => {
+          await completeDraftAndRedirect();
+        },
+        onFailure: () => (location.href = `${origin}/checkout`),
+        onCancel: () => (location.href = `${origin}/checkout`),
+        onClose: () => (location.href = `${origin}/checkout`),
+      };
 
+      if (window.ModoSDK && typeof ModoSDK.modoInitPayment === "function") {
+        ModoSDK.modoInitPayment(modalObject);
+      } else {
+        const img = new Image();
+        img.alt = "QR de pago MODO";
+        img.style.maxWidth = "260px";
+        img.src = `https://chart.googleapis.com/chart?chs=260x260&cht=qr&chl=${encodeURIComponent(
+          data.qrString
+        )}`;
+        (document.body).appendChild(img);
+        setStatus("Escaneá el QR o abrí la app MODO.");
+        logDebug("SDK MODO no disponible. Mostrando QR estático.");
+      }
+      showBtns();
+    }
+
+    (async () => {
+      showSpinner(true);
+      try {
+        if (!amount || amount <= 0) {
+          throw new Error("Monto inválido o faltante.");
+        }
+        $("amountText").textContent = amount.toFixed(2);
+        setPhase("Listo. Abrí la app o escaneá el QR para pagar.");
+        $("openModo").onclick = () => showModo();
+        $("doneBtn").onclick = () => completeDraftAndRedirect();
+        await showModo();
+        showSpinner(false);
+      } catch (e) {
+        console.error(e);
+        showSpinner(false);
+        setPhase("Error al preparar el pago.");
+        setStatus(e?.message || "Error inesperado");
+        showError("Ocurrió un error al generar el QR. Intentá nuevamente.");
+        logDebug(e);
+        showBtns();
+      }
+    })();
   </script>
 </body>
 </html>
