@@ -25,7 +25,10 @@ function ModoThankYou() {
   const amountNum = Number(raw);
   const amount = Number.isFinite(amountNum) && amountNum > 0 ? fmt(amountNum) : "0.00";
 
-  const url = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${encodeURIComponent(amount)}`;
+  // Obtener el orderId del checkout completado para fallback
+  const orderId = api?.checkout?.order?.id ?? "";
+
+  const url = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${encodeURIComponent(amount)}&orderId=${encodeURIComponent(orderId)}`;
 
   return (
     <BlockStack spacing="loose">

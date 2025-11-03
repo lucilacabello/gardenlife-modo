@@ -1,0 +1,9 @@
+import { reactExtension, BlockStack, Banner } from "@shopify/ui-extensions-react/checkout";
+
+export default reactExtension("purchase.thank-you.block.render", () => (
+  <BlockStack spacing="loose">
+    <Banner title="MODO (QR) — prueba mínima">
+      Render de prueba del bloque Thank-You. Si ves este banner, el bloque funciona.
+    </Banner>
+  </BlockStack>
+));
