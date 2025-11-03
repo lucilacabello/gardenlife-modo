@@ -9,18 +9,32 @@ import {
 
 export default reactExtension("purchase.thank-you.block.render", () => <ModoThankYou />);
 
+function fmt(n) {
+  try {
+    return Number(n).toFixed(2);
+  } catch {
+    return "0.00";
+  }
+}
+
 function ModoThankYou() {
   const api = useExtensionApi();
-  const orderId = api?.checkout?.order?.id || "";
-  const base = "https://gardenlife.com.ar/apps/modo/start.html?mode=ty";
-  const url = orderId ? `${base}&orderId=${encodeURIComponent(orderId)}` : base;
+
+  // Tomamos el total del checkout; en Thank-You suele estar disponible.
+  const raw = String(api?.checkout?.totalAmount?.amount ?? "0").replace(",", ".");
+  const amountNum = Number(raw);
+  const amount = Number.isFinite(amountNum) && amountNum > 0 ? fmt(amountNum) : "0.00";
+
+  const url = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${encodeURIComponent(amount)}`;
 
   return (
     <BlockStack spacing="loose">
-      <Banner title="Pago con MODO (QR)">
+      <Banner title="Pago con MODO (QR)" status="info">
         <Text>
-          Si elegiste MODO como medio de pago manual, podés abrir el QR para
-          finalizar el pago. Si ya pagaste, ignorá este mensaje.
+          Si elegiste MODO como medio de pago manual, abrí el QR para completar el pago.
+        </Text>
+        <Text>
+          Monto detectado: $ {amount}
         </Text>
       </Banner>
       <Button kind="primary" to={url}>
