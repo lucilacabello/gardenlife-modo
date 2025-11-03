@@ -12,38 +12,26 @@ export default reactExtension("purchase.thank-you.block.render", () => <ModoThan
 function ModoThankYou() {
   const api = useExtensionApi();
 
-  // Intentamos leer orderId y total desde el API del surface (sin hooks no soportados)
-  const orderId =
-    (api?.checkout && api.checkout.order && api.checkout.order.id) ||
-    ""; // puede venir como GID
+  // En Thank-You, orderId está disponible vía checkout.order.id (GID)
+  const orderId = String(api?.checkout?.order?.id || "").trim();
 
-  const rawAmount =
-    (api?.checkout && api.checkout.totalAmount && api.checkout.totalAmount.amount) ||
-    "";
+  const startUrl = orderId
+    ? `https://gardenlife.com.ar/apps/modo/start.html?orderId=${encodeURIComponent(orderId)}`
+    : "https://gardenlife.com.ar/apps/modo/start.html";
 
-  let amount = "";
-  try {
-    const n = Number(String(rawAmount).replace(",", "."));
-    amount = Number.isFinite(n) && n > 0 ? n.toFixed(2) : "";
-  } catch {
-    amount = "";
-  }
-
-  const base = "https://gardenlife.com.ar/apps/modo/start.html?mode=ty";
-  const url =
-    base +
-    (orderId ? `&orderId=${encodeURIComponent(orderId)}` : "") +
-    (amount "");
+  const openModo = () => {
+    try { window.open(startUrl, "_blank", "noopener,noreferrer"); } catch {}
+  };
 
   return (
     <BlockStack spacing="loose">
       <Banner title="Pago con MODO (QR)">
         <Text>
-          Si elegiste MODO como medio de pago manual, podés abrir el QR para
-          finalizar el pago. Si ya pagaste, ignorá este mensaje.
+          Si elegiste MODO como medio manual, abrí el QR para finalizar el pago.
+          Si ya pagaste, ignorá este mensaje.
         </Text>
       </Banner>
-      <Button kind="primary" to={url}>
+      <Button kind="primary" onPress={openModo}>
         Abrir QR de MODO
       </Button>
     </BlockStack>
