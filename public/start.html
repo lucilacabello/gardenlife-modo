@@ -39,6 +39,8 @@
     const amountFromUrl = Number(String(q.get('amount') || '0').replace(',', '.'));
     let amount = 0;
 
+    console.log('start.html - Parámetros recibidos:', { mode, orderId, amountFromUrl });
+
     const PROXY_BASE = '/apps/modo';
     const $ = (id) => document.getElementById(id);
 
@@ -60,12 +62,10 @@
     }
 
     async function resolveAmountIfNeeded() {
-      // 1) Si viene por URL desde Thank-You, lo usamos directo
       if (Number.isFinite(amountFromUrl) && amountFromUrl > 0) {
         amount = amountFromUrl;
         return amount;
       }
-      // 2) Si no vino, pero hay orderId, consultamos backend
       if (orderId) {
         setStatus('Consultando monto de la orden…');
         const { ok, json, raw } = await fetchJSON(`${PROXY_BASE}/get-order-amount?orderId=${encodeURIComponent(orderId)}`);
@@ -76,7 +76,6 @@
         amount = Number(json.amount || 0);
         return amount;
       }
-      // 3) No hay amount ni orderId
       throw new Error('No se recibió el monto. Volvé a la página anterior e intentá nuevamente.');
     }
 

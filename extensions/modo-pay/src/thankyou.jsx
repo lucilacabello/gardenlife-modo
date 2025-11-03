@@ -20,13 +20,15 @@ function fmt(n) {
 function ModoThankYou() {
   const api = useExtensionApi();
 
-  // Tomamos el total del checkout; en Thank-You suele estar disponible.
   const raw = String(api?.checkout?.totalAmount?.amount ?? "0").replace(",", ".");
   const amountNum = Number(raw);
   const amount = Number.isFinite(amountNum) && amountNum > 0 ? fmt(amountNum) : "0.00";
 
-  // Obtener el orderId del checkout completado para fallback
   const orderId = api?.checkout?.order?.id ?? "";
+
+  // Logs para debug - revisa consola navegador en Thank You
+  console.log('ThankYou Modo - amount:', amount);
+  console.log('ThankYou Modo - orderId:', orderId);
 
   const url = `https://gardenlife.com.ar/apps/modo/start.html?mode=ty&amount=${encodeURIComponent(amount)}&orderId=${encodeURIComponent(orderId)}`;
 
